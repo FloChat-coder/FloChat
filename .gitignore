@@ -1,0 +1,30 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+*.log
+*.pot
+*.mo
+
+# Environment files - VERY IMPORTANT TO IGNORE
+.env
+lofty-sonar-459411-m9-d58ca585e33a.json # Or the specific name of your JSON key file
+client_secret_72150499564-acjhu9kpfu5008g005nu2lvgv5csje0b.apps.googleusercontent.com.json
+# IDE / Editor specific
+.vscode/
+.idea/
+*.swp
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS specific
+.DS_Store
+Thumbs.db
