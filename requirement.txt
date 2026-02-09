@@ -1,6 +1,0 @@
-flask
-flask-cors
-google-generativeai
-google-api-python-client
-python-dotenv
-gunicorn
