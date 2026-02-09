@@ -1,4 +1,5 @@
 import os
+import psycopg2
 import logging
 import json
 from flask import Flask, request, jsonify
@@ -33,20 +34,43 @@ sheets_service = build('sheets', 'v4', credentials=creds)
 
 # --- 2. THE MOCK DATABASE (Replace this with Supabase later) ---
 # This simulates 2 different customers paying for your software.
-CLIENTS_DB = {
-    "demo_client_1": {
-        "business_name": "My BBQ Shop",
-        "sheet_id": os.getenv("GOOGLE_SPREADSHEET_ID"), # Your current BBQ sheet
-        "gemini_key": os.getenv("GEMINI_API_KEY"),      # Your current Key
-        "sheet_range": "Sheet1!A1:D100"               # Assuming tab name is 'Products'
-    },
-    "demo_client_2": {
-        "business_name": "Tech Gadget Store",
-        "sheet_id": "1pIYyrHO56RefNGbakd4Ae36Sxc_tYc3fSh4SNdy_sDs", # Create a dummy sheet to test!
-        "gemini_key": os.getenv("GEMINI_API_KEY"),      # Can use same key for testing
-        "sheet_range": "Sheet1!A1:D20"
-    }
-}
+DB_URL = os.getenv("postgresql://postgres:[Chud!@mnuh07301992]@db.dpofvjsynavtqyvzqgot.supabase.co:5432/postgres")
+
+def get_db_connection():
+    conn = psycopg2.connect(DB_URL)
+    return conn
+
+def get_client_config(client_id):
+    """
+    Fetches client credentials from real SQL database.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # SQL Query: Securely fetch the client
+        query = "SELECT business_name, sheet_id, gemini_key, sheet_range FROM clients WHERE client_id = %s;"
+        cur.execute(query, (client_id,))
+        row = cur.fetchone()
+        
+        cur.close()
+        
+        if row:
+            return {
+                "business_name": row[0],
+                "sheet_id": row[1],
+                "gemini_key": row[2],
+                "sheet_range": row[3]
+            }
+        return None
+        
+    except Exception as e:
+        print(f"Database Error: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
 
 # --- 3. HELPER FUNCTIONS ---
 
@@ -85,7 +109,7 @@ def chat():
     client_id = data.get('client_id', '') # <--- CRITICAL NEW FIELD
 
     # 1. Validate the Client
-    client_config = CLIENTS_DB.get(client_id)
+    client_config = get_client_config.get(client_id)
     if not client_config:
         return jsonify({"reply": "Error: Invalid Client ID. Who are you?"})
 
