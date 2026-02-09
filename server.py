@@ -34,7 +34,7 @@ sheets_service = build('sheets', 'v4', credentials=creds)
 
 # --- 2. THE MOCK DATABASE (Replace this with Supabase later) ---
 # This simulates 2 different customers paying for your software.
-DB_URL = os.getenv("postgresql://postgres:[Chud!@mnuh07301992]@db.dpofvjsynavtqyvzqgot.supabase.co:5432/postgres")
+DB_URL = os.getenv("DATABASE_URL")
 
 def get_db_connection():
     conn = psycopg2.connect(DB_URL)
@@ -109,7 +109,7 @@ def chat():
     client_id = data.get('client_id', '') # <--- CRITICAL NEW FIELD
 
     # 1. Validate the Client
-    client_config = get_client_config.get(client_id)
+    client_config = get_client_config(client_id)
     if not client_config:
         return jsonify({"reply": "Error: Invalid Client ID. Who are you?"})
 
