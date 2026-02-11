@@ -101,6 +101,11 @@ def get_user_services(client_id):
         logging.error(f"Service Build Failed: {e}")
         return None, None
 
+# --- Route 0: Demo
+@app.route('/demo')
+def demo():
+    return render_template('demo.html')
+
 # --- 3. OAUTH FLOW (Sign Up / Login) ---
 
 # --- ROUTE 1: LANDING PAGE ---
@@ -344,3 +349,4 @@ def chat():
 if __name__ == '__main__':
     print("🚀 OAuth Server Running on http://127.0.0.1:5000")
     app.run(port=5000, debug=True)
+
