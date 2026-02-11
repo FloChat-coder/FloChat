@@ -4,4 +4,6 @@ google-generativeai
 google-api-python-client
 python-dotenv
 gunicorn
+json
+python-dateutil
 psycopg2-binary
