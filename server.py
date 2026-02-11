@@ -104,7 +104,7 @@ def get_user_services(client_id):
 # --- Route 0: Demo
 @app.route('/demo')
 def demo():
-    return render_template('demo.html')
+    return render_template('demo_website.html')
 
 # --- 3. OAUTH FLOW (Sign Up / Login) ---
 
@@ -349,4 +349,5 @@ def chat():
 if __name__ == '__main__':
     print("🚀 OAuth Server Running on http://127.0.0.1:5000")
     app.run(port=5000, debug=True)
+
 
