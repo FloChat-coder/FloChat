@@ -9,6 +9,9 @@ from dateutil import parser
 from flask import Flask, redirect, url_for, session, request, jsonify, render_template_string
 from flask_cors import CORS
 from dotenv import load_dotenv
+import smtplib
+from email.mime.text import MIMEText
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Google Libraries
 import google.generativeai as genai
@@ -27,7 +30,11 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev_secret_key_change_in_prod")
 CORS(app)
 
 # Allow OAuth over HTTP for localhost testing
-# os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+# Import SMTP
+SMTP_EMAIL = os.getenv("SMTP_EMAIL")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 
 # DATABASE & CONFIG
 DB_URL = os.getenv("DATABASE_URL")
@@ -100,11 +107,6 @@ def get_user_services(client_id):
     except Exception as e:
         logging.error(f"Service Build Failed: {e}")
         return None, None
-
-# --- Route 0: Demo
-@app.route('/demo')
-def demo():
-    return render_template('demo_website.html')
 
 # --- 3. OAUTH FLOW (Sign Up / Login) ---
 
@@ -183,6 +185,29 @@ def oauth2callback():
 
     session['client_id'] = client_id
     return redirect('/dashboard')
+
+# Email Registration
+def send_verification_email(user_email, token):
+    if not SMTP_EMAIL or not SMTP_PASSWORD:
+        logging.error("❌ SMTP Credentials missing. Cannot send email.")
+        return
+
+    # Change to your production URL when live
+    verify_url = url_for('verify_email', token=token, _external=True)
+    
+    msg = MIMEText(f"Welcome to FloChat! Click here to verify your account: {verify_url}")
+    msg['Subject'] = "Verify your FloChat Account"
+    msg['From'] = SMTP_EMAIL
+    msg['To'] = user_email
+
+    try:
+        # Using Gmail's standard SSL port
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(SMTP_EMAIL, SMTP_PASSWORD)
+            server.send_message(msg)
+        logging.info(f"✅ Verification email sent to {user_email}")
+    except Exception as e:
+        logging.error(f"❌ Email Failed: {e}")
 
 # --- 4. DASHBOARD ---
 
@@ -345,9 +370,119 @@ def chat():
         return jsonify({"reply": response.text})
     except Exception as e:
         return jsonify({"reply": "AI Error. Check API Key."})
+    
+# --- EMAIL AUTH ROUTES ---
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+
+    if not email or not password:
+        return jsonify({"error": "Email and password required"}), 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    # 1. Check if user exists
+    cur.execute("SELECT client_id FROM clients WHERE email = %s", (email,))
+    if cur.fetchone():
+        cur.close()
+        conn.close()
+        return jsonify({"error": "Email already registered"}), 400
+
+    # 2. Generate ID and Token (Matching your existing logic)
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    client_id = ''.join(secrets.choice(alphabet) for i in range(5))
+    token = secrets.token_urlsafe(32)
+    hashed_pw = generate_password_hash(password)
+
+    # 3. Insert new user (Verified = False)
+    try:
+        cur.execute("""
+            INSERT INTO clients (client_id, email, password_hash, verification_token, verified)
+            VALUES (%s, %s, %s, %s, FALSE)
+        """, (client_id, email, hashed_pw, token))
+        conn.commit()
+    except Exception as e:
+        logging.error(f"Register DB Error: {e}")
+        return jsonify({"error": "Database error"}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+    # 4. Send Email
+    send_verification_email(email, token)
+
+    return jsonify({"message": "Registration successful. Please check your email."})
+
+
+@app.route('/api/verify')
+def verify_email():
+    token = request.args.get('token')
+    if not token: return "Missing token", 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Find user by token
+    cur.execute("SELECT client_id FROM clients WHERE verification_token = %s", (token,))
+    row = cur.fetchone()
+    
+    if not row:
+        cur.close()
+        conn.close()
+        return "Invalid or expired token.", 400
+
+    # Verify User
+    client_id = row[0]
+    cur.execute("UPDATE clients SET verified = TRUE, verification_token = NULL WHERE client_id = %s", (client_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    # Log them in automatically (Optional)
+    session['client_id'] = client_id
+    
+    # Redirect to Dashboard
+    return redirect('/dashboard')
+
+
+@app.route('/api/login', methods=['POST'])
+def api_login():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Fetch User
+    cur.execute("SELECT client_id, password_hash, verified FROM clients WHERE email = %s", (email,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    if not row:
+        return jsonify({"error": "Invalid credentials"}), 401
+        
+    client_id, stored_hash, is_verified = row
+
+    # Check Password (only if hash exists - prevents Google users from password login without setting one)
+    if not stored_hash:
+        return jsonify({"error": "Please log in with Google"}), 400
+
+    if not check_password_hash(stored_hash, password):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    if not is_verified:
+        return jsonify({"error": "Please verify your email first."}), 403
+
+    # Success! Set session
+    session['client_id'] = client_id
+    return jsonify({"message": "Login successful", "redirect": "/dashboard"})
 
 if __name__ == '__main__':
     print("🚀 OAuth Server Running on http://127.0.0.1:5000")
     app.run(port=5000, debug=True)
-
-
