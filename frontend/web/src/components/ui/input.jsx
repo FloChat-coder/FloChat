@@ -1,3 +1,4 @@
+import React from 'react';
 /**
  * Input component for consistent form styling
  * @param {Object} props - Component props
@@ -40,4 +41,6 @@ function Input({
   );
 }
 
+// Export both named and default to satisfy all imports
+export { Input };
 export default Input;

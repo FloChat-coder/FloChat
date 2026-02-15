@@ -2,6 +2,11 @@ import React from 'react';
 
 /**
  * Card component for consistent container styling
+ * @param {Object} props - Component props
+ * @param {React.ReactNode} props.children - Card content
+ * @param {'default'|'light'|'darker'} [props.variant='default'] - Card background variant
+ * @param {string} [props.className=''] - Additional CSS classes
+ * @param {'none'|'small'|'default'|'large'} [props.padding='default'] - Padding size
  */
 function Card({
   children,

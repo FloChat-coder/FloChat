@@ -47,4 +47,6 @@ function Button({
   );
 }
 
+// Export both named and default to satisfy all imports
+export { Button };
 export default Button;
