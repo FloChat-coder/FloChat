@@ -6,17 +6,17 @@ echo "🚀 Starting Build Process..."
 
 # 1. Build Landing Page
 echo "--- Building Landing Page ---"
-cd web
+cd frontend/web
 npm install
 npm run build
-cd ..
+cd ../..
 
 # 2. Build DashDark (Dashboard)
 echo "--- Building Dashboard ---"
-cd dash
+cd frontend/dash
 npm install
 npm run build
-cd ..
+cd ../..
 
 # 3. Organize Files for Flask
 echo "--- Moving Static Files to Backend ---"
@@ -25,10 +25,10 @@ rm -rf backend/static
 mkdir -p backend/static/dashboard
 
 # Copy Landing Page files to root of static
-cp -r web/dist/* backend/static/
+cp -r frontend/web/dist/* backend/static/
 
 # Copy Dashboard files to static/dashboard
-cp -r dash/dist/* backend/static/dashboard/
+cp -r frontend/dash/dist/* backend/static/dashboard/
 
 # 4. Install Python Dependencies
 echo "--- Installing Python Requirements ---"
