@@ -70,8 +70,8 @@ const router = createBrowserRouter(
   ],
   {
     // IMPORTANT: If running on localhost, change this to '/'
-    // If deploying to a specific folder (like GitHub Pages), keep '/dashdarkX'
-    basename: '/dashdarkX', 
+    // If deploying to a specific folder (like GitHub Pages), keep '/dash'
+    basename: '/dash', 
   },
 );
 
