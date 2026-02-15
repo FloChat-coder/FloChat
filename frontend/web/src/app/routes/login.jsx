@@ -30,10 +30,6 @@ const Login = () => {
     }
   };
 
-  const handleGoogleLogin = () => {
-    window.location.href = "https://flochat-ocya.onrender.com/login";
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-black p-4 relative overflow-hidden">
       {/* Background Gradients */}
@@ -52,26 +48,27 @@ const Login = () => {
         </CardHeader>
         
         <CardContent className="space-y-6">
-          {/* Google Login */}
-          <Button 
-            variant="outline" 
-            className="w-full h-12 bg-white text-black hover:bg-gray-100 border-0 font-medium"
-            onClick={handleGoogleLogin}
+          {/* Google Login - Restored to Original Style 
+            Uses 'a' tag for direct link, matching old 'btn-google' class behavior
+          */}
+          <a 
+            href="https://flochat-ocya.onrender.com/login" 
+            className="flex items-center justify-center bg-white border border-slate-300 py-3 px-4 rounded-md text-slate-700 font-semibold hover:bg-slate-50 transition-all duration-200 cursor-pointer text-decoration-none w-full"
           >
             <img 
-              src="https://www.svgrepo.com/show/475656/google-color.svg" 
-              className="w-5 h-5 mr-2" 
-              alt="Google" 
+              src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Google_Favicon_2025.svg" 
+              alt="G" 
+              className="w-5 h-5 mr-3"
             />
-            Continue with Google
-          </Button>
+            Sign in with Google
+          </a>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-gray-800" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-gray-900 px-2 text-gray-500">Or continue with</span>
+              <span className="bg-gray-900 px-2 text-gray-500">Or continue with email</span>
             </div>
           </div>
 
@@ -87,7 +84,7 @@ const Login = () => {
               <label className="text-sm font-medium text-gray-300">Email</label>
               <Input 
                 type="email" 
-                placeholder="m@example.com" 
+                placeholder="email@example.com" 
                 className="bg-gray-800/50 border-gray-700 text-white placeholder:text-gray-500 h-11"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

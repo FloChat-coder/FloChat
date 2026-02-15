@@ -39,7 +39,22 @@ os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 SMTP_EMAIL = os.getenv("SMTP_EMAIL")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 DB_URL = os.getenv("DATABASE_URL")
-CLIENT_SECRETS_FILE = os.getenv("GOOGLE_CLIENT_SECRETS_FILE", "client_secret.json")
+
+def get_client_secrets_file():
+    # Priority 1: Env Var
+    env_path = os.getenv("GOOGLE_CLIENT_SECRETS_FILE")
+    if env_path and os.path.exists(env_path):
+        return env_path
+    
+    # Priority 2: Render Secret Path
+    render_path = "/etc/secrets/client_secret.json"
+    if os.path.exists(render_path):
+        return render_path
+        
+    # Priority 3: Local Directory (Default)
+    return "client_secret.json"
+
+CLIENT_SECRETS_FILE = get_client_secrets_file()
 
 SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email',
