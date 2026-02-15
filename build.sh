@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exit immediately if a command exits with a non-zero status
+# Exit on error
 set -o errexit
 
 echo "🚀 Starting Build Process..."
@@ -18,19 +18,7 @@ npm install
 npm run build
 cd ../..
 
-# 3. Organize Files for Flask
-echo "--- Moving Static Files to Backend ---"
-# Clean old static folder
-rm -rf backend/static
-mkdir -p backend/static/dashboard
-
-# Copy Landing Page files to root of static
-cp -r frontend/web/dist/* backend/static/
-
-# Copy Dashboard files to static/dashboard
-cp -r frontend/dash/dist/* backend/static/dashboard/
-
-# 4. Install Python Dependencies
+# 3. Install Python Dependencies
 echo "--- Installing Python Requirements ---"
 cd backend
 pip install -r requirements.txt
