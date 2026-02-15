@@ -1,0 +1,116 @@
+{
+  "pricing": {
+    "title": "Lifetime Access. One Payment.",
+    "subtitle": "Start for free. Upgrade only when you need more power. No monthly fees.",
+    "monthlyLabel": null,
+    "annualLabel": null,
+    "savings": null
+  },
+  "plans": [
+    {
+      "id": "free",
+      "name": "Free Trial",
+      "price": "0",
+      "period": "forever",
+      "description": "Test the waters",
+      "ctaText": "Start Free",
+      "ctaLink": "/register",
+      "popular": false,
+      "features": [
+        { "name": "Chatbot (Default Key) ", "included": true },
+        { "name": "Google Sheets Integration", "included": true },
+        { "name": "Custom System Prompt", "included": false },
+        { "name": "Analytics Dashboard", "included": false },
+        { "name": "Lead Generation", "included": false },
+        { "name": "Read PDF / Docs / Web", "included": false }
+      ]
+    },
+    {
+      "id": "tier1",
+      "name": "License Tier 1",
+      "price": "49",
+      "period": "lifetime",
+      "description": "For Solopreneurs & Small Businesses",
+      "ctaText": "Buy Lifetime Deal",
+      "ctaLink": "/register",
+      "popular": false,
+      "features": [
+        { "name": "Chatbot (BYOK)", "included": true },
+        { "name": "Google Sheets Integration", "included": true },
+        { "name": "Custom System Prompt", "included": true },
+        { "name": "Analytics Dashboard", "included": false },
+        { "name": "Lead Generation", "included": false },
+        { "name": "Read PDF / Docs / Web", "included": false }
+      ]
+    },
+    {
+      "id": "tier2",
+      "name": "License Tier 2",
+      "price": "99",
+      "period": "lifetime",
+      "description": "For Growing Businesses",
+      "ctaText": "Buy Lifetime Deal",
+      "ctaLink": "/register",
+      "popular": true,
+      "features": [
+        { "name": "5 Active Chatbots (BYOK)", "included": true },
+        { "name": "Google Sheets Integration", "included": true },
+        { "name": "Custom System Prompt", "included": true },
+        { "name": "Analytics Dashboard", "included": true },
+        { "name": "Lead Generation (Email)", "included": true },
+        { "name": "Read PDF / Docs / Web", "included": false }
+      ]
+    },
+    {
+      "id": "tier3",
+      "name": "License Tier 3",
+      "price": "199",
+      "period": "lifetime",
+      "description": "For Power Users. Full AI Context.",
+      "ctaText": "Buy Lifetime Deal",
+      "ctaLink": "/register",
+      "popular": false,
+      "features": [
+        { "name": "Unlimited Chatbots (BYOK)", "included": true },
+        { "name": "Google Sheets Integration", "included": true },
+        { "name": "Custom System Prompt", "included": true },
+        { "name": "Analytics Dashboard", "included": true },
+        { "name": "Lead Generation (Email)", "included": true },
+        { "name": "Read PDF / Docs / Web", "included": true }
+      ]
+    },
+    {
+      "id": "enterprise",
+      "name": "Enterprise",
+      "price": "Custom",
+      "period": "contact",
+      "description": "Enterprise Grade Users",
+      "ctaText": "Contact Sales",
+      "ctaLink": "/contact",
+      "popular": false,
+      "features": [
+        { "name": "Unlimited Chatbots", "included": true },
+        { "name": "Google Sheets Integration", "included": true },
+        { "name": "Custom System Prompt", "included": true },
+        { "name": "Analytics Dashboard", "included": true },
+        { "name": "Lead Generation (Email)", "included": true },
+        { "name": "Read PDF / Docs / Web", "included": true },
+        { "name": "Contact to know more features", "included": true }
+      ]
+    }
+  ],
+  "faqs": [
+    {
+      "question": "Does Lifetime really mean forever?",
+      "answer": "Yes. You pay once and get access to the features in your tier forever. No monthly subscriptions."
+    },
+    {
+      "question": "What is the Free Trial limit?",
+      "answer": "The free trial gives you a chatbot to test run whether this service is a fit for you with a default key of free Gemini API."
+    },
+    {
+      "question": "What does 'BYOK' mean?",
+      "answer": "It means Bring Your Own Key. You have the freedom to use your own preferred AI API key to run the service."
+    }
+  ]
+}

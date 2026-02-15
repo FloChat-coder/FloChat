@@ -1,0 +1,46 @@
+/* src/index.css */
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=clash-grotesk@400,500,600,700&display=swap');
+
+:root {
+  --color-purple: #8c52ff;
+  --scrollbar-width: 6px;
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: #343B4F;
+  --scrollbar-thumb-hover: #4A5568;
+}
+
+/* FORCE BLACK BACKGROUND */
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background-color: #000000 !important; /* !important overrides everything else */
+  color: #ffffff;
+  font-family: 'Work Sans', 'Clash Grotesk', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+  height: var(--scrollbar-width);
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+@font-face {
+  font-family: 'Mona Sans';
+  src: url('./assets/fonts/mona-sans/WOFF-2/MonaSans-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}

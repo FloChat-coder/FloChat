@@ -1,0 +1,168 @@
+{
+  "initialTestimonials": {
+    "column1": [
+      {
+        "id": 1,
+        "avatar": "/images/avatar2.png",
+        "name": "Leslie Alexander",
+        "username": "@lesliealexnader",
+        "content": "Finances are very important to me. I regularly plan my expenses and save for the future.",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      },
+      {
+        "id": 2,
+        "avatar": "/images/avatar6.png",
+        "name": "Brooklyn Simmons",
+        "username": "@brooklynsimmons",
+        "content": "Finances are a matter of responsibility and discipline for me. I try to monitor my expenses and savings on an ongoing basis to avoid financial problems.",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      }
+    ],
+    "column2": [
+      {
+        "id": 3,
+        "avatar": "/images/avatar3.png",
+        "name": "Kristin Watson",
+        "username": "@kristinawatson",
+        "content": "Finances are very important to me. I regularly plan my expenses and save for the future.",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      },
+      {
+        "id": 4,
+        "avatar": "/images/avatar3.png",
+        "name": "Rob Mason",
+        "username": "@robmason",
+        "content": "Prioritizing finances is a constant for me. I regularly budget and save, emphasizing the importance of planning for the future.",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      }
+    ],
+    "column3": [
+      {
+        "id": 5,
+        "avatar": "/images/avatar4.png",
+        "name": "Marvin McKinney",
+        "username": "@marvinmckinney",
+        "content": "Finances are a part of life that needs constant attention. I try to regularly analyze my expenses",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      },
+      {
+        "id": 6,
+        "avatar": "/images/avatar7.png",
+        "name": "Devon Lane",
+        "username": "@devonlane",
+        "content": "Finances are a part of life that needs constant attention. I try to regularly analyze my expenses",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      }
+    ],
+    "column4": [
+      {
+        "id": 7,
+        "avatar": "/images/avatar5.png",
+        "name": "Kathryn Murphy",
+        "username": "@kathrynmurphy",
+        "content": "Finances are one of the most important things in life. I have to be careful not to spend too much and have enough money for everything",
+        "extraContent": [
+          "I'm not very knowledgeable about finances, but I try to stay on top of my expenses and take advice from experts.",
+          "I don't like thinking about finances, but I know I have to take care of them. I try to take care of my savings and control my expenses."
+        ],
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      },
+      {
+        "id": 8,
+        "avatar": "/images/avatar8.png",
+        "name": "Arlene McCoy",
+        "username": "@arlenemccoy",
+        "content": "Finances are a part of life that needs constant attention. I try to regularly analyze my expenses",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      }
+    ]
+  },
+  "hiddenTestimonials": {
+    "column1": [
+      {
+        "id": 9,
+        "avatar": "/images/avatar9.png",
+        "name": "Bessie Cooper",
+        "username": "@bessiecooper",
+        "content": "I'm interested in new technologies in the field of finance, such as blockchain or robo-advisors. I believe these new tools can help manage money more efficiently.",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      },
+      {
+        "id": 10,
+        "avatar": "/images/avatar9.png",
+        "name": "Mike Rochs",
+        "username": "@mikerochs",
+        "content": "Financial management can be a source of stress. Balancing budgets and making prudent decisions requires careful consideration, but it's a challenge I navigate diligently.",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      }
+    ],
+    "column2": [
+      {
+        "id": 11,
+        "avatar": "/images/avatar2.png",
+        "name": "Lucas Floe",
+        "username": "@lucasfloe",
+        "content": "I firmly believe that investing in education and acquiring new skills is pivotal for a secure financial future. It's a strategic move that aligns with my commitment to financial stability.",
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      },
+      {
+        "id": 12,
+        "avatar": "/images/avatar10.png",
+        "name": "Jerome Bell",
+        "username": "@jeromebell",
+        "content": "I'm convinced that investing in education and acquiring new skills is a key factor in building a stable financial future.",
+        "extraContent": ["Managing finances can be stressful."],
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      }
+    ],
+    "column3": [
+      {
+        "id": 13,
+        "avatar": "/images/avatar11.png",
+        "name": "Ronald Richards",
+        "username": "@ronaldrichards",
+        "content": "I'm convinced that investing in education and acquiring new skills is a key factor in building a stable financial future.",
+        "extraContent": ["Managing finances can be stressful."],
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      },
+      {
+        "id": 14,
+        "avatar": "/images/avatar8.png",
+        "name": "Kevin Roland",
+        "username": "@kevinroland",
+        "content": "Responsibility and discipline drive my approach to finances. Regularly monitoring expenses and savings is a routine for me, ensuring a proactive stance to prevent potential financial issues.",
+        "extraContent": ["Managing finances can be stressful."],
+        "time": "5:48 PM",
+        "likes": "232 like",
+        "comments": "81 com."
+      }
+    ],
+    "column4": []
+  }
+}

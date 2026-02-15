@@ -1,0 +1,25 @@
+{
+  "features": [
+    {
+      "icon": "/images/icons/shield.svg",
+      "title": "Google Sheets Sync",
+      "description": "Edit your spreadsheet, and your chatbot updates instantly. No re-training required."
+    },
+    {
+      "icon": "/images/icons/zap.svg",
+      "title": "Zero Hallucinations",
+      "description": "The bot sticks strictly to your data. It won't make up facts about your business."
+    },
+    {
+      "icon": "/images/icons/bar-chart.svg",
+      "title": "Lead Generation",
+      "description": "Collect emails and names from visitors directly inside the chat conversation."
+    }
+  ],
+  "secureAccessFeatures": [
+    "Instant Setup (Under 2 mins)",
+    "GPT-4 & Gemini AI Models",
+    "Custom Brand Colors",
+    "Embed on Any Website"
+  ]
+}

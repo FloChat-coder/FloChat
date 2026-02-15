@@ -1,0 +1,312 @@
+/* @import 'tailwindcss';
+
+@theme {
+  --color-body: #0e0f11;
+  --color-green-400: #ccff00;
+  --color-green-500: #b2e600;
+  --color-blueGray-950: #2a2e35;
+  --color-gray-50: #f6f6f6;
+  --color-gray-100: #e7e7e7;
+  --color-gray-200: #d1d1d1;
+  --color-gray-300: #b0b0b0;
+  --color-gray-400: #888888;
+  --color-gray-500: #6d6d6d;
+  --color-gray-600: #5d5d5d;
+  --color-gray-700: #4c4c4c;
+  --color-gray-800: #454545;
+  --color-gray-900: #3d3d3d;
+  --spacing-body: 1rem;
+}
+
+:root {
+  --color-green-50: #fdffe4;
+  --color-green-100: #f9ffc4;
+  --color-green-200: #f1ff90;
+  --color-green-300: #e2ff50;
+  --color-green-400: #ccff00;
+  --color-green-500: #b2e600;
+  --color-green-600: #8ab800;
+  --color-green-700: #688b00;
+  --color-green-800: #526d07;
+  --color-green-900: #455c0b;
+
+  --color-blueGray-50: #f4f6f7;
+  --color-blueGray-100: #e4e7e9;
+  --color-blueGray-200: #cbd1d6;
+  --color-blueGray-300: #a7b0b9;
+  --color-blueGray-400: #7b8795;
+  --color-blueGray-500: #606c7a;
+  --color-blueGray-600: #535b67;
+  --color-blueGray-700: #474e57;
+  --color-blueGray-800: #3f434b;
+  --color-blueGray-900: #383c41;
+  --color-blueGray-950: #2a2e35;
+
+  --color-gray-50: #f6f6f6;
+  --color-gray-100: #e7e7e7;
+  --color-gray-200: #d1d1d1;
+  --color-gray-300: #b0b0b0;
+  --color-gray-400: #888888;
+  --color-gray-500: #6d6d6d;
+  --color-gray-600: #5d5d5d;
+  --color-gray-700: #4c4c4c;
+  --color-gray-800: #454545;
+  --color-gray-900: #3d3d3d;
+
+  
+  --color-body-bg: #0e0f11;
+  --color-body-text: #fff;
+}
+
+
+body {
+  background-color: var(--color-body-bg);
+  color: var(--color-body-text);
+  font-family: 'Clash Grotesk', ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+    sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+.bg-body {
+  background-color: var(--color-body-bg);
+}
+
+.text-body {
+  color: var(--color-body-text);
+} */
+
+@import 'tailwindcss';
+
+@theme {
+  --color-body: #0e0f11;
+  
+  /* UPDATED: Neon Violet Palette (#8c52ff) */
+  --color-green-50: #fbf7ff;
+  --color-green-100: #f2eaff;
+  --color-green-200: #e4d4ff;
+  --color-green-300: #d0b0ff;
+  
+  --color-green-400: #8c52ff; /* YOUR NEON BASE */
+  --color-green-500: #7c3aed; /* Deep Vibrant Purple (Accent) */
+  
+  --color-green-600: #6d28d9;
+  --color-green-700: #5b21b6; /* Rich Dark Purple */
+  --color-green-800: #4c1d95;
+  --color-green-900: #2e1065; /* Almost Black Purple */
+
+  /* Neutrals */
+  --color-blueGray-950: #2a2e35;
+  --color-gray-50: #f6f6f6;
+  --color-gray-100: #e7e7e7;
+  --color-gray-200: #d1d1d1;
+  --color-gray-300: #b0b0b0;
+  --color-gray-400: #888888;
+  --color-gray-500: #6d6d6d;
+  --color-gray-600: #5d5d5d;
+  --color-gray-700: #4c4c4c;
+  --color-gray-800: #454545;
+  --color-gray-900: #3d3d3d;
+  --spacing-body: 1rem;
+}
+
+:root {
+  /* UPDATED: Root Variables */
+  --color-green-50: #fbf7ff;
+  --color-green-100: #f2eaff;
+  --color-green-200: #e4d4ff;
+  --color-green-300: #d0b0ff;
+  
+  --color-green-400: #8c52ff; /* NEON BASE */
+  --color-green-500: #7c3aed; /* ACCENT */
+  
+  --color-green-600: #6d28d9;
+  --color-green-700: #5b21b6;
+  --color-green-800: #4c1d95;
+  --color-green-900: #2e1065;
+
+  /* ... The rest stays exactly the same ... */
+  --color-blueGray-50: #f4f6f7;
+  --color-blueGray-100: #e4e7e9;
+  --color-blueGray-200: #cbd1d6;
+  --color-blueGray-300: #a7b0b9;
+  --color-blueGray-400: #7b8795;
+  --color-blueGray-500: #606c7a;
+  --color-blueGray-600: #535b67;
+  --color-blueGray-700: #474e57;
+  --color-blueGray-800: #3f434b;
+  --color-blueGray-900: #383c41;
+  --color-blueGray-950: #2a2e35;
+
+  --color-gray-50: #f6f6f6;
+  --color-gray-100: #e7e7e7;
+  --color-gray-200: #d1d1d1;
+  --color-gray-300: #b0b0b0;
+  --color-gray-400: #888888;
+  --color-gray-500: #6d6d6d;
+  --color-gray-600: #5d5d5d;
+  --color-gray-700: #4c4c4c;
+  --color-gray-800: #454545;
+  --color-gray-900: #3d3d3d;
+
+  --color-body-bg: #0e0f11;
+  --color-body-text: #fff;
+}
+
+body {
+  background-color: var(--color-body-bg);
+  color: var(--color-body-text);
+  font-family: 'Clash Grotesk', ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+    sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom utility classes */
+.bg-body {
+  background-color: var(--color-body-bg);
+}
+
+.text-body {
+  color: var(--color-body-text);
+}
+
+.bg-gradient-radial-dark {
+  background-image: radial-gradient(
+    72.2% 78.49% at 49.87% 50.1%,
+    rgba(71, 80, 98, 0.26) 0%,
+    rgba(137, 137, 137, 0) 100%
+  );
+}
+
+.bg-gradient-radial-dark-light {
+  background-image: radial-gradient(
+    80.63% 80.22% at 52.97% 50%,
+    rgba(71, 80, 98, 0.46) 0%,
+    rgba(137, 137, 137, 0) 100%
+  );
+}
+
+.bg-gradient-radial-light {
+  background-image: radial-gradient(
+    90.27% 103.98% at 73.03% 35.14%,
+    rgba(232, 239, 254, 0.26) 0%,
+    rgba(51, 56, 65, 0.13) 100%
+  );
+}
+
+.bg-gradient-radial-darker {
+  background-image: linear-gradient(
+    180deg,
+    #0e0f11 0%,
+    rgba(14, 15, 17, 0) 100%
+  );
+}
+
+.bg-gradient-radial-darker3 {
+  background-image: linear-gradient(0deg, #0e0f11 0%, rgba(14, 15, 17, 0) 100%);
+}
+
+.bg-gradient-radial-darker2 {
+  background-image: linear-gradient(
+    270deg,
+    #0e0f11 0%,
+    rgba(14, 15, 17, 0) 100%
+  );
+}
+
+.bg-gradient-card {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(0, 0, 0, 0) 6.77%,
+    #000 100%
+  );
+}
+
+@keyframes slow-pan {
+  0% {
+    transform: scale(1.1) translate(0%, 0%);
+  }
+  50% {
+    transform: scale(1.1) translate(-2%, -2%); /* Subtle movement */
+  }
+  100% {
+    transform: scale(1.1) translate(0%, 0%);
+  }
+}
+
+.animate-pan {
+  animation: slow-pan 20s infinite ease-in-out;
+}
+
+/* Animation 1: Drifts Up and Left */
+@keyframes drift-1 {
+  0% { transform: scale(1.1) translate(0, 0); }
+  50% { transform: scale(1.1) translate(-2%, -2%); }
+  100% { transform: scale(1.1) translate(0, 0); }
+}
+
+/* Animation 2: Drifts Down/Right + Slight Rotation (Creates the Morph illusion) */
+@keyframes drift-2 {
+  0% { transform: scale(1.1) translate(0, 0) rotate(0deg); }
+  50% { transform: scale(1.1) translate(2%, 2%) rotate(2deg); }
+  100% { transform: scale(1.1) translate(0, 0) rotate(0deg); }
+}
+
+.animate-drift-1 {
+  animation: drift-1 25s ease-in-out infinite;
+}
+
+.animate-drift-2 {
+  animation: drift-2 35s ease-in-out infinite;
+}
+
+.font-heading {
+  font-family: 'Clash Grotesk', ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans',
+    sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji';
+}
+
+.text-10xl {
+  font-size: 6rem;
+  line-height: 1;
+}
+
+.tracking-3xl {
+  letter-spacing: -0.64px;
+}
+
+.tracking-8xl {
+  letter-spacing: -3.6px;
+}
+
+.rounded-5xl {
+  border-radius: 1.875rem;
+}
+
+.rounded-6xl {
+  border-radius: 2.25rem;
+}
+
+.rounded-7xl {
+  border-radius: 2.75rem;
+}
+
+.rounded-t-7xl {
+  border-top-left-radius: 2.75rem;
+  border-top-right-radius: 2.75rem;
+}
+
+.rounded-b-7xl {
+  border-bottom-left-radius: 2.75rem;
+  border-bottom-right-radius: 2.75rem;
+}
+
+

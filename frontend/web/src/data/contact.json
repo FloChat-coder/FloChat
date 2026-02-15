@@ -1,0 +1,17 @@
+{
+  "contact": {
+    "title": "Send us a message and our team will get back to you",
+    "subtitle": "Send us a message",
+    "description": "Global Bank is a strategic branding agency focused on brand creation, rebrands, and brand"
+  },
+  "form": {
+    "fields": [
+      {"name": "firstName", "placeholder": "Full name", "type": "text", "required": true},
+      {"name": "lastName", "placeholder": "Last Name", "type": "text", "required": true},
+      {"name": "email", "placeholder": "E-mail", "type": "email", "required": true},
+      {"name": "company", "placeholder": "Company", "type": "text", "required": false}
+    ],
+    "locationOptions": ["Poland", "Norway", "France", "Germany", "Spain"],
+    "submitText": "Send Message"
+  }
+}

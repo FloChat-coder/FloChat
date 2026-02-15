@@ -1,0 +1,8 @@
+{
+  "navigationItems": [
+    { "to": "/demo", "label": "Live Demo" }, 
+    { "to": "/pricing", "label": "Pricing" },
+    { "to": "#how-it-works", "label": "How it Works" },
+    { "to": "/contact", "label": "Contact" }
+  ]
+}

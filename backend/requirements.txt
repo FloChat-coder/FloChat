@@ -1,0 +1,12 @@
+flask
+flask-cors
+google-generativeai
+google-api-python-client
+python-dotenv
+gunicorn
+psycopg2-binary
+python-dateutil
+google-auth-oauthlib
+flask-session
+requests
+werkzeug

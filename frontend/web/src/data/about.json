@@ -1,0 +1,53 @@
+{
+  "hero": {
+    "label": "Check our stats",
+    "title": "About us",
+    "description": "Making credit history with banking",
+    "content": "Global Bank is a strategic branding agency focused on brand creation, rebrands, and brand transformations. We partner with companies to create powerful and engaging brand experiences that connect with customers and drive business growth.",
+    "image": "/images/abouts/about.png",
+    "ctaText": "Read more"
+  },
+  "stats": [
+    { "value": "$1.5B+", "label": "Assets Under Management" },
+    { "value": "100+", "label": "Active Clients" },
+    { "value": "150+", "label": "Countries Served" },
+    { "value": "40+", "label": "Years Experience" }
+  ],
+  "story": {
+    "label": "Check our stats",
+    "title": "Making credit history with nightcard",
+    "content": "It is a long established fact that a reader will be distracted by the readable content of a page when looking at its layout. The point of using Lorem Ipsum is that it has a more-or-less normal distribution of letters, as opposed to using 'Content here, content here', making it look like readable English.",
+    "images": [
+      "/images/abouts/img2.png",
+      "/images/abouts/img4.png",
+      "/images/abouts/img3.png",
+      "/images/abouts/img.png"
+    ]
+  },
+  "team": [
+    { "name": "Guy Hawkins", "role": "CEO at Global Bank", "image": "/images/avatar1.png" },
+    { "name": "Brooklyn Simmons", "role": "CFO at Global Bank", "image": "/images/avatar2.png" },
+    { "name": "Floyd Miles", "role": "Head Marketer Global Bank", "image": "/images/avatar3.png" },
+    { "name": "Jenny Wilson", "role": "Support Lead Global Bank", "image": "/images/avatar4.png" },
+    { "name": "Esther Howard", "role": "Design at Global Bank", "image": "/images/avatar5.png" },
+    { "name": "Leslie Alexander", "role": "Engineer at Global Bank", "image": "/images/avatar6.png" }
+  ],
+  "jobs": [
+    { "position": "Product Manager, Instagram Camera", "department": "marketing", "commitment": "Full Time", "location": "Los Angeles", "category": "marketing" },
+    { "position": "UX Designer", "department": "design", "commitment": "Full Time", "location": "San Francisco", "category": "design" },
+    { "position": "Senior Frontend Developer", "department": "engineering", "commitment": "Full Time", "location": "Remote", "category": "software-engineering" },
+    { "position": "Customer Success Manager", "department": "support", "commitment": "Full Time", "location": "New York", "category": "customer-success" },
+    { "position": "Sales Representative", "department": "sales", "commitment": "Full Time", "location": "Chicago", "category": "sales" },
+    { "position": "Marketing Specialist", "department": "marketing", "commitment": "Part Time", "location": "Austin", "category": "marketing" },
+    { "position": "Backend Engineer", "department": "engineering", "commitment": "Full Time", "location": "Remote", "category": "software-engineering" },
+    { "position": "Content Designer", "department": "design", "commitment": "Contract", "location": "Portland", "category": "design" }
+  ],
+  "jobCategories": [
+    { "id": "all", "label": "All" },
+    { "id": "design", "label": "Design" },
+    { "id": "software-engineering", "label": "Software Engineering" },
+    { "id": "customer-success", "label": "Customer Success" },
+    { "id": "sales", "label": "Sales" },
+    { "id": "marketing", "label": "Marketing" }
+  ]
+}

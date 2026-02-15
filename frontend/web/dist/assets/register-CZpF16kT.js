@@ -1,0 +1,1 @@
+import{j as t}from"./index-rY3olgLX.js";import{P as e}from"./page-layout-DRfB0COE.js";import{A as r}from"./auth-section-C6LYqDSM.js";import{L as o}from"./learn-to-code-cta-section-C34EQFo9.js";import"./input-yIsPK653.js";function p(){return t.jsxs(e,{title:"Register - Global Bank",children:[t.jsx(r,{type:"register"}),t.jsx(o,{})]})}export{p as default};

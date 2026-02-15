@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FloChat Dashboard</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; margin: 0; padding: 40px; color: #334155; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+        .badge { background: #dbeafe; color: #1e40af; padding: 5px 10px; border-radius: 20px; font-size: 0.9em; font-weight: bold; }
+        
+        .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        
+        label { display: block; font-weight: 600; margin-bottom: 8px; color: #0f172a; }
+        input, textarea { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+        .help-text { font-size: 0.85em; color: #64748b; margin-top: -15px; margin-bottom: 20px; display: block; }
+        
+        button { background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; }
+        button:hover { background: #1d4ed8; }
+        
+        .code-block { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 6px; font-family: monospace; overflow-x: auto; position: relative; }
+        .step { margin-bottom: 30px; border-bottom: 1px solid #e2e8f0; padding-bottom: 20px; }
+        .step:last-child { border-bottom: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>⚙️ FloChat Dashboard</h1>
+        <span class="badge">Bot ID: {{ client_id }}</span>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <form action="/api/update_settings" method="POST">
+                
+                <div class="step">
+                    <label>1. Business Name</label>
+                    <input type="text" name="business_name" value="{{ business_name }}" placeholder="e.g. Mario's Pizza">
+                </div>
+
+                <div class="step">
+                    <label>2. Google Sheet ID</label>
+                    <input type="text" name="sheet_id" value="{{ sheet_id }}" placeholder="19V0a-wGaFjpc...">
+                    <span class="help-text">Copy the ID from your Sheet URL (between <code>/d/</code> and <code>/edit</code>).</span>
+                </div>
+
+                <div class="step">
+                    <label>3. AI Brain (Gemini API Key)</label>
+                    <input type="password" name="gemini_key" value="{{ gemini_key }}" placeholder="AIzaSy...">
+                    <span class="help-text">We use your key to keep costs low. <a href="https://aistudio.google.com/app/apikey" target="_blank">Get one here.</a></span>
+                </div>
+
+                <div class="step">
+                    <label>4. Custom Instructions</label>
+                    <textarea name="system_instruction" rows="4" placeholder="You are a helpful support agent...">{{ system_instruction }}</textarea>
+                    <span class="help-text">Teach the bot how to behave (e.g., "Be funny," "Answer briefly").</span>
+                </div>
+
+                <button type="submit">Save & Update Bot</button>
+            </form>
+        </div>
+
+        <div class="card" style="height: fit-content;">
+            <label>🚀 Deploy Your Widget</label>
+            <p style="font-size: 0.9em; color: #64748b;">Copy this code and paste it into your website's <code>&lt;body&gt;</code>.</p>
+            
+            <div class="code-block">
+&lt;script 
+ src="https://cdn.jsdelivr.net/gh/FloChat-coder/FloChat@main/widget.js" 
+ id="flochat-script" 
+ data-client-id="{{ client_id }}"&gt;
+&lt;/script&gt;
+            </div>
+            <br>
+            <label>Status</label>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 10px; height: 10px; background: #22c55e; border-radius: 50%;"></div>
+                <span style="font-size: 0.9em;">System Active</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
