@@ -161,7 +161,10 @@ def chat():
         model = genai.GenerativeModel('gemini-pro')
         
         full_prompt = f"""
-        {system_prompt or 'You are a helpful assistant.'}
+        {system_prompt or 'You are a helpful assistant. You will be asked questions from the user. '
+        'Use the provided knowledge base to answer the question. If the context does not contain the answer, say you don''t know. '
+        'The column names signify the type of data in the column. For example, if a column is named "Revenue", it contains revenue data. '
+        'If a column is named "Product Name", ''it contains product names.'}
         
         Here is the knowledge base you should use to answer user queries:
         ---
@@ -219,7 +222,8 @@ def google_auth():
     flow = Flow.from_client_secrets_file(
         GOOGLE_CLIENT_SECRET_FILE, 
         scopes=SCOPES,
-        redirect_uri=url_for('google_auth_callback', _external=True)
+        # ADD _scheme='https' here:
+        redirect_uri=url_for('google_auth_callback', _external=True, _scheme='https')
     )
     
     authorization_url, state = flow.authorization_url(
@@ -238,7 +242,7 @@ def google_auth_callback():
         GOOGLE_CLIENT_SECRET_FILE, 
         scopes=SCOPES, 
         state=state,
-        redirect_uri=url_for('google_auth_callback', _external=True)
+        redirect_uri=url_for('google_auth_callback', _external=True, _scheme='https')
     )
     
     flow.fetch_token(authorization_response=request.url)
@@ -259,7 +263,7 @@ def google_auth_callback():
 # --- 6. STATIC SERVING ROUTES (Merged from your file) ---
 
 # Serve Widget (Allow CORS)
-@app.route('/widget.js')
+@app.route('/static/widget.js')
 def serve_widget_js():
     return send_from_directory(os.path.join(BASE_DIR, 'static'), 'widget.js')
 
