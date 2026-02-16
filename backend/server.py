@@ -175,6 +175,11 @@ def serve_dashboard(path=''):
 def serve_web_assets(path):
     return send_from_directory(os.path.join(WEB_DIST, 'assets'), path)
 
+@app.route('/static/widget.js')
+def serve_widget():
+    # Serves the JS file from: backend/static/widget.js
+    return send_from_directory(os.path.join(BASE_DIR, 'static'), 'widget.js')
+
 # D. Serve Demo Page (FIXED)
 @app.route('/demo')
 def demo():
@@ -184,6 +189,7 @@ def demo():
             return f.read()
     except Exception as e:
         return f"Demo file not found: {e}", 404
+    
 
 # E. Serve Web Landing Page (Catch-All)
 @app.route('/', defaults={'path': ''})
