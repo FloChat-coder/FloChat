@@ -4,13 +4,15 @@ import secrets
 import psycopg2
 import logging
 import requests
-import google.generativeai as genai
-
 from flask import Flask, redirect, url_for, session, request, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timezone
+from dateutil import parser 
 
 # Google Libraries
+import google.generativeai as genai
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
@@ -29,268 +31,354 @@ TEMPLATE_DIR = os.path.join(BASE_DIR, 'templates')
 
 app = Flask(__name__, static_folder=None)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev_secret_key_change_in_prod")
-CORS(app) 
+CORS(app)
 
-# Google Config
-GOOGLE_CLIENT_SECRET_FILE = os.path.join(BASE_DIR, 'client_secret.json')
+# Allow OAuth over HTTP (Render proxy handles HTTPS)
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+DB_URL = os.getenv("DATABASE_URL")
+
+# --- SMART SECRET FILE FINDER ---
+def get_client_secrets_file():
+    # Check Render's secret path first
+    render_path = "/etc/secrets/client_secret.json"
+    if os.path.exists(render_path):
+        return render_path
+    # Fallback to local (development)
+    local_path = os.path.join(BASE_DIR, "client_secret.json")
+    if os.path.exists(local_path):
+        return local_path
+    # Fallback to env var
+    return os.getenv("GOOGLE_CLIENT_SECRETS_FILE", "client_secret.json")
+
+CLIENT_SECRETS_FILE = get_client_secrets_file()
+
 SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email',
-    'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/spreadsheets.readonly',
-    'https://www.googleapis.com/auth/drive.readonly'
+    'https://www.googleapis.com/auth/drive.readonly',
+    'openid'
 ]
 
-# Database Config
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "flochat")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASS = os.getenv("DB_PASS", "password")
-
-# --- 2. DATABASE HELPER ---
 def get_db_connection():
-    conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS)
-    return conn
+    try:
+        return psycopg2.connect(DB_URL)
+    except Exception as e:
+        logging.error(f"❌ DB Connection Failed: {e}")
+        return None
 
-# --- 3. HELPER FUNCTIONS ---
-
-def credentials_to_dict(credentials):
-    return {
-        'token': credentials.token,
-        'refresh_token': credentials.refresh_token,
-        'token_uri': credentials.token_uri,
-        'client_id': credentials.client_id,
-        'client_secret': credentials.client_secret,
-        'scopes': credentials.scopes
-    }
-
-def get_google_creds(user_id):
-    """Retreives and refreshes Google Credentials for a user from DB"""
+# --- HELPER: DYNAMIC GOOGLE AUTH ---
+def get_user_services(client_id):
     conn = get_db_connection()
+    if not conn: return None, None
+    
     cur = conn.cursor()
-    cur.execute("SELECT google_token FROM users WHERE id = %s", (user_id,))
+    cur.execute("SELECT google_token, google_refresh_token, token_uri, client_id_google, client_secret_google FROM clients WHERE client_id = %s", (client_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
-
-    if not row or not row[0]:
-        return None
-
-    token_data = json.loads(row[0])
-    creds = Credentials(**token_data)
+    
+    if not row: return None, None
+    token, refresh_token, token_uri, client_id_google, client_secret_google = row
+    
+    with open(CLIENT_SECRETS_FILE, 'r') as f:
+        c_conf = json.load(f).get('web', {})
+        
+    creds = Credentials(
+        token=token,
+        refresh_token=refresh_token,
+        token_uri=c_conf.get('token_uri', "https://oauth2.googleapis.com/token"),
+        client_id=c_conf.get('client_id'),
+        client_secret=c_conf.get('client_secret'),
+        scopes=SCOPES
+    )
 
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
-            # Update DB with new token
-            conn = get_db_connection()
-            cur = conn.cursor()
-            cur.execute("UPDATE users SET google_token = %s WHERE id = %s", 
-                        (json.dumps(credentials_to_dict(creds)), user_id))
-            conn.commit()
-            cur.close()
-            conn.close()
         except Exception as e:
-            logging.error(f"Failed to refresh token: {e}")
-            return None
-    return creds
+            logging.error(f"Token Refresh Failed for {client_id}: {e}")
+            return None, None
 
-def get_sheet_data(creds, spreadsheet_id):
-    """Fetches all data from the first sheet"""
     try:
-        service = build('sheets', 'v4', credentials=creds)
-        sheet = service.spreadsheets()
-        # Fetch spreadsheet metadata to get the first sheet's title
-        spreadsheet = sheet.get(spreadsheetId=spreadsheet_id).execute()
-        first_sheet_title = spreadsheet['sheets'][0]['properties']['title']
-        
-        # Fetch values
-        result = sheet.values().get(spreadsheetId=spreadsheet_id, range=first_sheet_title).execute()
-        rows = result.get('values', [])
-        
-        # Simple serialization: Join rows with newlines
-        context_text = ""
-        for row in rows:
-            context_text += ", ".join([str(item) for item in row]) + "\n"
-            
-        return context_text
+        sheets_service = build('sheets', 'v4', credentials=creds)
+        drive_service = build('drive', 'v3', credentials=creds)
+        return sheets_service, drive_service
     except Exception as e:
-        logging.error(f"Error fetching sheet data: {e}")
-        return ""
+        logging.error(f"Service Build Failed: {e}")
+        return None, None
 
-# --- 4. API ROUTES (CHAT & CONFIG) ---
+# --- HELPER: SYNC SHEET ---
+def fetch_and_process_sheet(client_id, sheet_id, sheet_range):
+    sheets_service, _ = get_user_services(client_id)
+    if not sheets_service: return None
+
+    try:
+        result = sheets_service.spreadsheets().values().get(
+            spreadsheetId=sheet_id, range=sheet_range).execute()
+        rows = result.get('values', [])
+        if not rows: return "[]"
+
+        headers = [h.strip() for h in rows[0]]
+        json_data = []
+        for row in rows[1:501]: 
+            row_dict = {}
+            for i, header in enumerate(headers):
+                if i < len(row) and row[i]:
+                    row_dict[header] = row[i]
+            if row_dict: json_data.append(row_dict)
+            
+        return json.dumps(json_data, ensure_ascii=False)
+    except Exception as e:
+        logging.error(f"Sheet Read Error: {e}")
+        return None
+
+def sync_knowledge_base(client_id, sheet_id, sheet_range):
+    new_content = fetch_and_process_sheet(client_id, sheet_id, sheet_range)
+    if new_content is None: return None
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE clients SET cached_content = %s, last_synced_at = NOW() WHERE client_id = %s", (new_content, client_id))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return new_content
+
+# --- 2. API & AUTH ROUTES (MUST BE DEFINED FIRST) ---
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    """Core Chat Endpoint used by the Widget"""
-    data = request.json
+    # Force JSON parsing (silence 400 error if header is wrong)
+    data = request.get_json(force=True, silent=True)
+    if not data:
+        return jsonify({"reply": "Error: No data sent"}), 400
+
+    client_id = data.get('client_id')
     user_message = data.get('message')
-    widget_id = data.get('clientId') # In this SaaS, clientId is the user_id
-
-    if not user_message or not widget_id:
-        return jsonify({'error': 'Missing data'}), 400
+    temp_context = data.get('temp_context')
 
     conn = get_db_connection()
     cur = conn.cursor()
-    
-    # Fetch User Configuration
-    cur.execute("SELECT sheet_id, system_prompt, openai_key FROM users WHERE id = %s", (widget_id,))
-    user_config = cur.fetchone()
+    cur.execute("""
+        SELECT business_name, sheet_id, gemini_key, sheet_range, cached_content, last_synced_at, system_instruction 
+        FROM clients WHERE client_id = %s
+    """, (client_id,))
+    row = cur.fetchone()
     cur.close()
     conn.close()
 
-    if not user_config:
-        return jsonify({'error': 'Widget not found'}), 404
+    if not row: return jsonify({"reply": "Invalid Client ID"})
+    
+    b_name, sheet_id, gemini_key, sheet_range, cached_content, db_last_synced, sys_instr = row
 
-    sheet_id, system_prompt, api_key = user_config
+    # --- KNOWLEDGE BASE SELECTION ---
+    if temp_context:
+        # 1. Use Data Grid from Website if available
+        knowledge_base = json.dumps(temp_context)
+        system_note = "IMPORTANT: Answer solely based on the USER PROVIDED DATA GRID below."
+    else:
+        # 2. Use Google Sheet (Check for updates first)
+        need_sync = False
+        _, drive_service = get_user_services(client_id)
+        
+        if drive_service and sheet_id:
+            try:
+                file_meta = drive_service.files().get(fileId=sheet_id, fields="modifiedTime").execute()
+                google_time = parser.parse(file_meta.get('modifiedTime'))
+                if db_last_synced is None:
+                    need_sync = True
+                else:
+                    if db_last_synced.tzinfo is None:
+                        db_last_synced = db_last_synced.replace(tzinfo=timezone.utc)
+                    if google_time > db_last_synced:
+                        need_sync = True
+            except Exception as e:
+                if not cached_content: need_sync = True
+        
+        if need_sync:
+            updated = sync_knowledge_base(client_id, sheet_id, sheet_range)
+            if updated: cached_content = updated
 
-    if not api_key:
-        return jsonify({'error': 'AI Provider not configured'}), 500
+        if not cached_content or cached_content == "[]":
+            return jsonify({"reply": "I'm not ready yet. Please configure my knowledge base."})
+            
+        knowledge_base = cached_content
+        system_note = "Answer based on your knowledge base."
 
-    # 1. Fetch Context (RAG)
-    context = ""
-    if sheet_id:
-        creds = get_google_creds(widget_id)
-        if creds:
-            context = get_sheet_data(creds, sheet_id)
-            # Limit context size roughly
-            context = context[:30000] 
-
-    # 2. Prepare Gemini
+    # --- GEMINI CALL ---
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        prompt = f"ROLE: {sys_instr or 'Helpful Assistant'} for {b_name}. {system_note} DATA: {knowledge_base} USER: {user_message}"
         
-        full_prompt = f"""
-        {system_prompt or 'You are a helpful assistant. You will be asked questions from the user. '
-        'Use the provided knowledge base to answer the question. If the context does not contain the answer, say you don''t know. '
-        'The column names signify the type of data in the column. For example, if a column is named "Revenue", it contains revenue data. '
-        'If a column is named "Product Name", ''it contains product names.'}
+        response = model.generate_content(prompt)
         
-        Here is the knowledge base you should use to answer user queries:
-        ---
-        {context}
-        ---
+        # CRITICAL FIX: Return 'reply' key to match widget.js
+        return jsonify({"reply": response.text})
         
-        User Query: {user_message}
-        """
-        
-        response = model.generate_content(full_prompt)
-        return jsonify({'reply': response.text})
-    
     except Exception as e:
-        logging.error(f"AI Generation Error: {e}")
-        return jsonify({'error': 'Failed to generate response'}), 500
+        return jsonify({"reply": f"AI Error: {str(e)}"})
 
-
-@app.route('/api/save-config', methods=['POST'])
-def save_config():
-    """Saves Settings from the Dashboard"""
-    if 'client_id' not in session:
-        return jsonify({'error': 'Unauthorized'}), 401
-        
+@app.route('/api/login', methods=['POST'])
+def api_login():
     data = request.json
+    email = data.get('email')
+    password = data.get('password')
+
     conn = get_db_connection()
     cur = conn.cursor()
-    
-    # Update logic
-    if 'sheetUrl' in data:
-        # Extract ID from URL for simplicity
-        sheet_url = data['sheetUrl']
-        sheet_id = sheet_url.split('/d/')[1].split('/')[0] if '/d/' in sheet_url else sheet_url
-        cur.execute("UPDATE users SET sheet_id = %s WHERE id = %s", (sheet_id, session['client_id']))
-        
-    if 'systemPrompt' in data:
-        cur.execute("UPDATE users SET system_prompt = %s WHERE id = %s", (data['systemPrompt'], session['client_id']))
-        
-    if 'apiKey' in data:
-         cur.execute("UPDATE users SET openai_key = %s WHERE id = %s", (data['apiKey'], session['client_id']))
-
-    conn.commit()
+    cur.execute("SELECT client_id, password_hash, verified FROM clients WHERE email = %s", (email,))
+    row = cur.fetchone()
     cur.close()
     conn.close()
-    
-    return jsonify({'status': 'success'})
 
-# --- 5. AUTH ROUTES (Google) ---
+    if not row: return jsonify({"error": "Invalid credentials"}), 401
+    client_id, stored_hash, is_verified = row
 
-@app.route('/api/auth/google')
-def google_auth():
-    """Initiates Google OAuth Flow"""
-    if 'client_id' not in session:
-         return jsonify({'error': 'Please log in to the dashboard first'}), 401
+    if not stored_hash: return jsonify({"error": "Please log in with Google"}), 400
+    if not check_password_hash(stored_hash, password): return jsonify({"error": "Invalid credentials"}), 401
 
-    flow = Flow.from_client_secrets_file(
-        GOOGLE_CLIENT_SECRET_FILE, 
-        scopes=SCOPES,
-        # ADD _scheme='https' here:
-        redirect_uri=url_for('google_auth_callback', _external=True, _scheme='https')
-    )
-    
-    authorization_url, state = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true'
-    )
-    session['google_state'] = state
-    return redirect(authorization_url)
+    session['client_id'] = client_id
+    return jsonify({"message": "Login successful", "redirect": "/dashboard"})
 
-@app.route('/api/auth/google/callback')
-def google_auth_callback():
-    """Handles Google OAuth Callback"""
-    state = session.get('google_state')
-    
-    flow = Flow.from_client_secrets_file(
-        GOOGLE_CLIENT_SECRET_FILE, 
-        scopes=SCOPES, 
-        state=state,
-        redirect_uri=url_for('google_auth_callback', _external=True, _scheme='https')
-    )
-    
-    flow.fetch_token(authorization_response=request.url)
-    credentials = flow.credentials
-    
-    # Save credentials to DB linked to the logged-in user
-    creds_json = json.dumps(credentials_to_dict(credentials))
-    
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    email = data.get('email')
+    password = data.get('password')
+
+    if not email or not password:
+        return jsonify({"error": "Email and password required"}), 400
+
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("UPDATE users SET google_token = %s WHERE id = %s", (creds_json, session['client_id']))
-    conn.commit()
-    cur.close()
-    conn.close()
-    
-    return redirect('/dashboard/integrations/google-sheets')
+    cur.execute("SELECT client_id FROM clients WHERE email = %s", (email,))
+    if cur.fetchone():
+        cur.close()
+        conn.close()
+        return jsonify({"error": "Email already registered"}), 400
 
-# --- 6. STATIC SERVING ROUTES (Merged from your file) ---
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    client_id = ''.join(secrets.choice(alphabet) for i in range(5))
+    token = secrets.token_urlsafe(32)
+    hashed_pw = generate_password_hash(password)
 
-# Serve Widget (Allow CORS)
+    try:
+        cur.execute("""
+            INSERT INTO clients (client_id, email, password_hash, verification_token, verified)
+            VALUES (%s, %s, %s, %s, FALSE)
+        """, (client_id, email, hashed_pw, token))
+        conn.commit()
+    except Exception as e:
+        return jsonify({"error": "Database error"}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+    return jsonify({"message": "Registration successful."})
+
+# --- 3. GOOGLE OAUTH ROUTES ---
+
+@app.route('/login')
+def login():
+    try:
+        if not os.path.exists(CLIENT_SECRETS_FILE):
+            return f"Configuration Error: Secret file not found at {CLIENT_SECRETS_FILE}", 500
+
+        flow = Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES)
+        flow.redirect_uri = url_for('oauth2callback', _external=True, _scheme='https')
+        
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true')
+        
+        session['state'] = state
+        return redirect(authorization_url)
+    except Exception as e:
+        logging.error(f"Login Start Error: {e}")
+        return f"Error starting login: {e}", 500
+
+@app.route('/login/callback')
+def oauth2callback():
+    state = session.get('state')
+    if not state: return redirect('/login')
+
+    try:
+        flow = Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
+        flow.redirect_uri = url_for('oauth2callback', _external=True, _scheme='https')
+
+        authorization_response = request.url
+        if authorization_response.startswith('http:'):
+            authorization_response = authorization_response.replace('http:', 'https:', 1)
+
+        flow.fetch_token(authorization_response=authorization_response)
+        creds = flow.credentials
+        
+        user_info = requests.get(
+            'https://www.googleapis.com/oauth2/v1/userinfo', 
+            headers={'Authorization': f'Bearer {creds.token}'}).json()
+        email = user_info.get('email')
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT client_id FROM clients WHERE email = %s;", (email,))
+        existing_user = cur.fetchone()
+        
+        with open(CLIENT_SECRETS_FILE, 'r') as f:
+            c_conf = json.load(f).get('web', {})
+
+        if existing_user:
+            client_id = existing_user[0]
+            cur.execute("""
+                UPDATE clients 
+                SET google_token=%s, google_refresh_token=%s 
+                WHERE client_id=%s
+            """, (creds.token, creds.refresh_token, client_id))
+        else:
+            alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+            client_id = ''.join(secrets.choice(alphabet) for i in range(5))
+            cur.execute("""
+                INSERT INTO clients (client_id, email, google_token, google_refresh_token, token_uri, client_id_google, client_secret_google)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (client_id, email, creds.token, creds.refresh_token, creds.token_uri, c_conf.get('client_id'), c_conf.get('client_secret')))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        session['client_id'] = client_id
+        return redirect('/dashboard')
+        
+    except Exception as e:
+        logging.error(f"Callback Error: {e}")
+        return f"Authentication failed: {e}", 500
+
+# --- 4. STATIC & FRONTEND SERVING ROUTES ---
+
 @app.route('/static/widget.js')
-def serve_widget_js():
+def serve_widget():
+    # Explicitly serve the widget
     return send_from_directory(os.path.join(BASE_DIR, 'static'), 'widget.js')
 
-# Serve Dashboard Assets
 @app.route('/dashboard/assets/<path:path>')
 def serve_dash_assets(path):
     return send_from_directory(os.path.join(DASH_DIST, 'assets'), path)
 
-# Serve Dashboard Index - Handles all dashboard routes
-@app.route('/dashboard', defaults={'path': ''})
+@app.route('/dashboard')
 @app.route('/dashboard/<path:path>')
-def serve_dashboard(path):
-    # In a real app, you might check session here, 
-    # but for now we let the frontend handle the redirect if not logged in
-    # OR we implement a simple session check:
-    # if 'client_id' not in session and path != 'login':
-    #     return redirect('/login') 
-    
-    # Serve index.html for any dashboard route (SPA support)
-    return send_from_directory(DASH_DIST, 'index.html')
+def serve_dashboard(path=''):
+    if 'client_id' not in session:
+        return redirect('/login')
+    try:
+        return send_from_directory(DASH_DIST, path)
+    except:
+        return send_from_directory(DASH_DIST, 'index.html')
 
-# Serve Web Assets
 @app.route('/assets/<path:path>')
 def serve_web_assets(path):
     return send_from_directory(os.path.join(WEB_DIST, 'assets'), path)
 
-# Serve Demo Page
 @app.route('/demo')
 def demo():
     try:
@@ -298,21 +386,15 @@ def demo():
     except Exception as e:
         return f"Demo file not found: {e}", 404
 
-# Serve Web Landing Page (Catch-All - MUST BE LAST)
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
 def serve_root(path):
+    if path.startswith('api/') or path.startswith('login'):
+        return "Not Found", 404
     try:
-        # Try to serve file if it exists (e.g. robots.txt)
         return send_from_directory(WEB_DIST, path)
     except:
-        # Otherwise serve index.html for SPA
         return send_from_directory(WEB_DIST, 'index.html')
 
-# --- 7. RUNNER ---
 if __name__ == '__main__':
-    # Ensure client_secret.json exists
-    if not os.path.exists(GOOGLE_CLIENT_SECRET_FILE):
-        logging.warning("⚠️  client_secret.json not found! Google Auth will fail.")
-        
     app.run(host='0.0.0.0', port=5000, debug=True)
