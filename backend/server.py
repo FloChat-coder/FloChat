@@ -175,7 +175,7 @@ def chat():
         """
         
         response = model.generate_content(full_prompt)
-        return jsonify({'response': response.text})
+        return jsonify({'reply': response.text})
     
     except Exception as e:
         logging.error(f"AI Generation Error: {e}")
