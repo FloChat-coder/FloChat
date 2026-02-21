@@ -10,3 +10,4 @@ google-auth-oauthlib
 flask-session
 requests
 werkzeug
+litellm

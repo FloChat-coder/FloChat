@@ -11,8 +11,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone
 from dateutil import parser 
 
-# Google Libraries
-import google.generativeai as genai
+# Universal LLM Router
+import litellm 
+from litellm import completion, token_counter, get_max_tokens
+
+# Google Libraries (Kept for Drive/Sheets sync)
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
@@ -40,15 +43,12 @@ DB_URL = os.getenv("DATABASE_URL")
 
 # --- SMART SECRET FILE FINDER ---
 def get_client_secrets_file():
-    # Check Render's secret path first
     render_path = "/etc/secrets/client_secret.json"
     if os.path.exists(render_path):
         return render_path
-    # Fallback to local (development)
     local_path = os.path.join(BASE_DIR, "client_secret.json")
     if os.path.exists(local_path):
         return local_path
-    # Fallback to env var
     return os.getenv("GOOGLE_CLIENT_SECRETS_FILE", "client_secret.json")
 
 CLIENT_SECRETS_FILE = get_client_secrets_file()
@@ -145,7 +145,7 @@ def sync_knowledge_base(client_id, sheet_id, sheet_range):
     conn.close()
     return new_content
 
-# --- 2. API & AUTH ROUTES (MUST BE DEFINED FIRST) ---
+# --- 2. API & AUTH ROUTES ---
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -167,17 +167,18 @@ def chat():
     try:
         # 1. Get Client Data
         cur.execute("""
-            SELECT business_name, sheet_id, gemini_key, sheet_range, cached_content, last_synced_at, system_instruction 
+            SELECT business_name, sheet_id, api_key, ai_provider, model_name, sheet_range, cached_content, last_synced_at, system_instruction 
             FROM clients WHERE client_id = %s
         """, (client_id,))
         row = cur.fetchone()
 
-        # NOTICE: We removed cur.close() and conn.close() from here!
-
         if not row: 
             return jsonify({"reply": "Invalid Client ID"})
         
-        b_name, sheet_id, gemini_key, sheet_range, cached_content, db_last_synced, sys_instr = row
+        b_name, sheet_id, api_key, ai_provider, model_name, sheet_range, cached_content, db_last_synced, sys_instr = row
+
+        if not api_key or not model_name:
+            return jsonify({"reply": "AI Provider not configured. Please add your API key in the dashboard."})
 
         # --- KNOWLEDGE BASE SELECTION ---
         if temp_context:
@@ -217,34 +218,48 @@ def chat():
             cur.execute("SELECT messages FROM chat_sessions WHERE session_id = %s", (session_id,))
             session_row = cur.fetchone()
             if session_row and session_row[0]:
-                chat_history = session_row[0] # This is a list of dicts
+                chat_history = session_row[0]
 
-        # 3. Apply Sliding Window (Keep only the last 6 interactions to save tokens)
+        # 3. Apply Sliding Window 
         recent_history = chat_history[-6:] 
         
-        # Format history for Gemini SDK
-        gemini_history = []
-        for msg in recent_history:
-            gemini_history.append({
-                "role": msg["role"],
-                "parts": [msg["content"]]
-            })
-
-        # 4. GEMINI CALL
-        genai.configure(api_key=gemini_key)
+        # 4. Format messages for LiteLLM
         full_system_prompt = f"ROLE: {sys_instr or 'Helpful Assistant'} for {b_name}. {system_note} DATA: {knowledge_base}"
         
-        model = genai.GenerativeModel(
-            model_name='gemini-2.5-flash',
-            system_instruction=full_system_prompt
-        )
+        llm_messages = [{"role": "system", "content": full_system_prompt}]
+        for msg in recent_history:
+            # map 'model' role back to standard 'assistant'
+            role = "assistant" if msg["role"] == "model" else msg["role"]
+            llm_messages.append({"role": role, "content": msg["content"]})
+            
+        llm_messages.append({"role": "user", "content": user_message})
+
+        # 5. Token Limit Check (Protects smaller context models)
+        try:
+            tokens = token_counter(model=model_name, messages=llm_messages)
+            max_tokens = get_max_tokens(model_name)
+            
+            # If we don't know the max, default to a safe 8k
+            if max_tokens is None: max_tokens = 8000 
+            
+            if tokens > max_tokens:
+                return jsonify({"reply": f"Warning: Your knowledge base is too large for the selected model ({model_name}). It uses {tokens} tokens but the limit is {max_tokens}. Please reduce your sheet size or upgrade to a model with a larger context window (like gemini-2.5-flash or claude-3.5-sonnet)."})
+        except Exception as e:
+            logging.warning(f"Could not calculate tokens for {model_name}: {e}")
+
+        # 6. LITELLM API CALL
+        try:
+            response = completion(
+                model=model_name,
+                messages=llm_messages,
+                api_key=api_key
+            )
+            bot_reply = response.choices[0].message.content
+        except Exception as e:
+            logging.error(f"LiteLLM Error: {str(e)}")
+            return jsonify({"reply": f"AI Provider Error: {str(e)}"}), 500
         
-        # Start a chat session with the recent history
-        chat = model.start_chat(history=gemini_history)
-        response = chat.send_message(user_message)
-        bot_reply = response.text
-        
-        # 5. Save back to Database
+        # 7. Save back to Database
         if session_id:
             chat_history.append({"role": "user", "content": user_message})
             chat_history.append({"role": "model", "content": bot_reply})
@@ -260,13 +275,89 @@ def chat():
         return jsonify({"reply": bot_reply})
 
     except Exception as e:
-        logging.error(f"AI Error: {str(e)}")
-        return jsonify({"reply": f"AI Error: {str(e)}"})
+        logging.error(f"Chat Error: {str(e)}")
+        return jsonify({"reply": f"Internal Error: {str(e)}"})
         
     finally:
-        # We close them HERE, guaranteed to happen no matter what route the code takes
         cur.close()
         conn.close()
+
+# --- AI CONFIGURATION API ---
+
+@app.route('/api/ai/settings', methods=['GET'])
+def get_ai_settings():
+    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT ai_provider, model_name, api_key, system_instruction FROM clients WHERE client_id = %s", (session['client_id'],))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if not row: return jsonify({"error": "Not found"}), 404
+    
+    provider, model, key, instr = row
+    return jsonify({
+        "provider": provider or "google",
+        "model": model or "gemini/gemini-2.5-flash",
+        "has_key": bool(key),
+        "system_instruction": instr or "You are a helpful assistant."
+    })
+
+@app.route('/api/ai/test', methods=['POST'])
+def test_ai_connection():
+    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.json
+    provider = data.get('provider')
+    model = data.get('model')
+    api_key = data.get('api_key')
+    
+    if not model or not api_key:
+        return jsonify({"success": False, "error": "Model and API Key required"}), 400
+
+    try:
+        response = completion(
+            model=model,
+            messages=[{"role": "user", "content": "Ping."}],
+            api_key=api_key,
+            max_tokens=5
+        )
+        return jsonify({"success": True, "message": "Connection successful!"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/ai/save', methods=['POST'])
+def save_ai_settings():
+    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.json
+    provider = data.get('provider')
+    model = data.get('model')
+    api_key = data.get('api_key')
+    sys_instr = data.get('system_instruction')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Only update API key if one was provided (don't overwrite with empty string if they are just updating prompt)
+    if api_key and api_key.strip():
+        cur.execute("""
+            UPDATE clients SET ai_provider=%s, model_name=%s, api_key=%s, system_instruction=%s 
+            WHERE client_id=%s
+        """, (provider, model, api_key, sys_instr, session['client_id']))
+    else:
+        cur.execute("""
+            UPDATE clients SET ai_provider=%s, model_name=%s, system_instruction=%s 
+            WHERE client_id=%s
+        """, (provider, model, sys_instr, session['client_id']))
+        
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    return jsonify({"success": True, "message": "Settings saved successfully"})
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
