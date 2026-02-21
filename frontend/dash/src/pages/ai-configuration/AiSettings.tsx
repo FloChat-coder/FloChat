@@ -131,7 +131,7 @@ const AiSettings = () => {
       
       <Grid item xs={12} md={6}>
         <Paper sx={{ p: 3, borderRadius: 4, height: '100%' }}>
-          <Stack spacing={3}>
+          <Stack direction="column" spacing={3}>
             <Typography variant="h6">1. Select AI Model</Typography>
             
             <Stack direction="row" spacing={2}>
