@@ -52,12 +52,9 @@ const router = createBrowserRouter(
             },
             // --- FLOCHAT AI SETTINGS ---
             {
-              path: paths.ai.prompt,
+              // CHANGED: Only one path mapped to AiSettings now
+              path: paths.aiSettings,
               element: <AiSettings />,
-            },
-            {
-              path: paths.ai.apiKeys,
-              element: <AiSettings />, // Placeholder until API Key page is built
             },
           ],
         },
@@ -69,8 +66,6 @@ const router = createBrowserRouter(
     },
   ],
   {
-    // CRITICAL FIX: Changed from '/dashdarkX' to '/dashboard'
-    // This matches your Flask route: @app.route('/dashboard')
     basename: '/dashboard', 
   },
 );

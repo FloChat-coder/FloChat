@@ -13,16 +13,13 @@ export default {
     googleSheets: `/${rootPaths.pagesRoot}/integrations/google-sheets`,
     drive: `/${rootPaths.pagesRoot}/integrations/drive`,
   },
-  ai: {
-    prompt: `/${rootPaths.pagesRoot}/ai/prompt`,
-    apiKeys: `/${rootPaths.pagesRoot}/ai/api-keys`,
-  },
+  aiSettings: `/${rootPaths.pagesRoot}/ai-settings`,
   leads: `/${rootPaths.pagesRoot}/leads`,
   analytics: `/${rootPaths.pagesRoot}/analytics`,
   widget: `/${rootPaths.pagesRoot}/widget`,
   settings: `/${rootPaths.pagesRoot}/settings`,
 
-  // External Auth (Handled by GlobalBank app)
+  // External Auth Paths
   login: 'https://flochat.com/signin',
   signup: 'https://flochat.com/register',
 

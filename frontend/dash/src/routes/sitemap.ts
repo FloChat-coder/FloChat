@@ -46,20 +46,8 @@ const sitemap: MenuItem[] = [
   {
     id: 'ai-settings',
     subheader: 'AI Configuration',
-    path: '#!',
+    path: paths.aiSettings,
     icon: 'mingcute:ai-fill',
-    items: [
-      {
-        name: 'System Prompt',
-        pathName: 'system-prompt',
-        path: paths.ai.prompt,
-      },
-      {
-        name: 'API Keys',
-        pathName: 'api-keys',
-        path: paths.ai.apiKeys,
-      },
-    ],
   },
   {
     id: 'leads',
