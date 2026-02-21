@@ -156,6 +156,7 @@ def chat():
 
     client_id = data.get('client_id')
     user_message = data.get('message')
+    session_id = data.get('session_id')
     temp_context = data.get('temp_context')
 
     conn = get_db_connection()
@@ -205,20 +206,65 @@ def chat():
             
         knowledge_base = cached_content
         system_note = "Answer based on your knowledge base."
+    # 2. Fetch or Create Chat History
+    cur.execute("SELECT messages FROM chat_sessions WHERE session_id = %s", (session_id,))
+    session_row = cur.fetchone()
+    
+    chat_history = []
+    if session_row and session_row[0]:
+        chat_history = session_row[0] # This is a list of dicts
+
+    # 3. Apply Sliding Window (Keep only the last 6 interactions to save tokens)
+    # Gemini expects history in a specific format: {"role": "user"/"model", "parts": ["text"]}
+    recent_history = chat_history[-6:] 
+    
+    # Format history for Gemini SDK
+    gemini_history = []
+    for msg in recent_history:
+        gemini_history.append({
+            "role": msg["role"],
+            "parts": [msg["content"]]
+        })    
 
     # --- GEMINI CALL ---
     try:
         genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel('gemini-2.5-flash')
-        prompt = f"ROLE: {sys_instr or 'Helpful Assistant'} for {b_name}. {system_note} DATA: {knowledge_base} USER: {user_message}"
         
-        response = model.generate_content(prompt)
+        # In Gemini 1.5/2.0, we can pass system instructions directly to the model configuration
+        full_system_prompt = f"ROLE: {sys_instr or 'Helpful Assistant'} for {b_name}. {system_note} DATA: {knowledge_base}"
         
-        # CRITICAL FIX: Return 'reply' key to match widget.js
-        return jsonify({"reply": response.text})
+        model = genai.GenerativeModel(
+            model_name='gemini-2.5-flash',
+            system_instruction=full_system_prompt
+        )
+        
+        # Start a chat session with the recent history
+        chat = model.start_chat(history=gemini_history)
+        response = chat.send_message(user_message)
+        bot_reply = response.text
+        
+        # 5. Save back to Database
+        # Append the new interaction to our internal history tracker
+        chat_history.append({"role": "user", "content": user_message})
+        chat_history.append({"role": "model", "content": bot_reply})
+        
+        # Upsert into database
+        cur.execute("""
+            INSERT INTO chat_sessions (session_id, client_id, messages, updated_at)
+            VALUES (%s, %s, %s, NOW())
+            ON CONFLICT (session_id) 
+            DO UPDATE SET messages = EXCLUDED.messages, updated_at = NOW();
+        """, (session_id, client_id, json.dumps(chat_history)))
+        conn.commit()
+        
+        return jsonify({"reply": bot_reply})
         
     except Exception as e:
+        logging.error(f"AI Error: {str(e)}")
         return jsonify({"reply": f"AI Error: {str(e)}"})
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/api/login', methods=['POST'])
 def api_login():

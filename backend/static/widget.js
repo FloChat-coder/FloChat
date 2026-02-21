@@ -8,6 +8,14 @@
 
     console.log("FloChat initializing for:", clientId);
 
+    //session id to identify users
+    let sessionId = localStorage.getItem('fc_session_id');
+    if (!sessionId) {
+    // Generate a simple UUID-like string if crypto.randomUUID isn't available
+    sessionId = crypto.randomUUID ? crypto.randomUUID() : 'sess_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('fc_session_id', sessionId);
+    }
+
     // 2. CONFIG: Switch this to your Render URL when going live!
     // const API_URL = "http://127.0.0.1:5000/api/chat"; 
     const API_URL = "https://flochat-ocya.onrender.com/api/chat";
@@ -69,7 +77,7 @@
             const res = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: text, client_id: clientId })
+                body: JSON.stringify({ message: text, client_id: clientId, session_id: sessionId })
             });
             const data = await res.json();
             msgsEl.innerHTML += `<div class="fc-msg fc-bot">${data.reply}</div>`;
