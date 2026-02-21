@@ -149,7 +149,6 @@ def sync_knowledge_base(client_id, sheet_id, sheet_range):
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    # Force JSON parsing (silence 400 error if header is wrong)
     data = request.get_json(force=True, silent=True)
     if not data:
         return jsonify({"reply": "Error: No data sent"}), 400
@@ -160,77 +159,79 @@ def chat():
     temp_context = data.get('temp_context')
 
     conn = get_db_connection()
+    if not conn:
+        return jsonify({"reply": "Database connection failed"}), 500
+        
     cur = conn.cursor()
-    cur.execute("""
-        SELECT business_name, sheet_id, gemini_key, sheet_range, cached_content, last_synced_at, system_instruction 
-        FROM clients WHERE client_id = %s
-    """, (client_id,))
-    row = cur.fetchone()
-    cur.close()
-    conn.close()
 
-    if not row: return jsonify({"reply": "Invalid Client ID"})
-    
-    b_name, sheet_id, gemini_key, sheet_range, cached_content, db_last_synced, sys_instr = row
-
-    # --- KNOWLEDGE BASE SELECTION ---
-    if temp_context:
-        # 1. Use Data Grid from Website if available
-        knowledge_base = json.dumps(temp_context)
-        system_note = "IMPORTANT: Answer solely based on the USER PROVIDED DATA GRID below."
-    else:
-        # 2. Use Google Sheet (Check for updates first)
-        need_sync = False
-        _, drive_service = get_user_services(client_id)
-        
-        if drive_service and sheet_id:
-            try:
-                file_meta = drive_service.files().get(fileId=sheet_id, fields="modifiedTime").execute()
-                google_time = parser.parse(file_meta.get('modifiedTime'))
-                if db_last_synced is None:
-                    need_sync = True
-                else:
-                    if db_last_synced.tzinfo is None:
-                        db_last_synced = db_last_synced.replace(tzinfo=timezone.utc)
-                    if google_time > db_last_synced:
-                        need_sync = True
-            except Exception as e:
-                if not cached_content: need_sync = True
-        
-        if need_sync:
-            updated = sync_knowledge_base(client_id, sheet_id, sheet_range)
-            if updated: cached_content = updated
-
-        if not cached_content or cached_content == "[]":
-            return jsonify({"reply": "I'm not ready yet. Please configure my knowledge base."})
-            
-        knowledge_base = cached_content
-        system_note = "Answer based on your knowledge base."
-    # 2. Fetch or Create Chat History
-    cur.execute("SELECT messages FROM chat_sessions WHERE session_id = %s", (session_id,))
-    session_row = cur.fetchone()
-    
-    chat_history = []
-    if session_row and session_row[0]:
-        chat_history = session_row[0] # This is a list of dicts
-
-    # 3. Apply Sliding Window (Keep only the last 6 interactions to save tokens)
-    # Gemini expects history in a specific format: {"role": "user"/"model", "parts": ["text"]}
-    recent_history = chat_history[-6:] 
-    
-    # Format history for Gemini SDK
-    gemini_history = []
-    for msg in recent_history:
-        gemini_history.append({
-            "role": msg["role"],
-            "parts": [msg["content"]]
-        })    
-
-    # --- GEMINI CALL ---
     try:
-        genai.configure(api_key=gemini_key)
+        # 1. Get Client Data
+        cur.execute("""
+            SELECT business_name, sheet_id, gemini_key, sheet_range, cached_content, last_synced_at, system_instruction 
+            FROM clients WHERE client_id = %s
+        """, (client_id,))
+        row = cur.fetchone()
+
+        # NOTICE: We removed cur.close() and conn.close() from here!
+
+        if not row: 
+            return jsonify({"reply": "Invalid Client ID"})
         
-        # In Gemini 1.5/2.0, we can pass system instructions directly to the model configuration
+        b_name, sheet_id, gemini_key, sheet_range, cached_content, db_last_synced, sys_instr = row
+
+        # --- KNOWLEDGE BASE SELECTION ---
+        if temp_context:
+            knowledge_base = json.dumps(temp_context)
+            system_note = "IMPORTANT: Answer solely based on the USER PROVIDED DATA GRID below."
+        else:
+            need_sync = False
+            _, drive_service = get_user_services(client_id)
+            
+            if drive_service and sheet_id:
+                try:
+                    file_meta = drive_service.files().get(fileId=sheet_id, fields="modifiedTime").execute()
+                    google_time = parser.parse(file_meta.get('modifiedTime'))
+                    if db_last_synced is None:
+                        need_sync = True
+                    else:
+                        if db_last_synced.tzinfo is None:
+                            db_last_synced = db_last_synced.replace(tzinfo=timezone.utc)
+                        if google_time > db_last_synced:
+                            need_sync = True
+                except Exception as e:
+                    if not cached_content: need_sync = True
+            
+            if need_sync:
+                updated = sync_knowledge_base(client_id, sheet_id, sheet_range)
+                if updated: cached_content = updated
+
+            if not cached_content or cached_content == "[]":
+                return jsonify({"reply": "I'm not ready yet. Please configure my knowledge base."})
+                
+            knowledge_base = cached_content
+            system_note = "Answer based on your knowledge base."
+
+        # 2. Fetch or Create Chat History
+        chat_history = []
+        if session_id:
+            cur.execute("SELECT messages FROM chat_sessions WHERE session_id = %s", (session_id,))
+            session_row = cur.fetchone()
+            if session_row and session_row[0]:
+                chat_history = session_row[0] # This is a list of dicts
+
+        # 3. Apply Sliding Window (Keep only the last 6 interactions to save tokens)
+        recent_history = chat_history[-6:] 
+        
+        # Format history for Gemini SDK
+        gemini_history = []
+        for msg in recent_history:
+            gemini_history.append({
+                "role": msg["role"],
+                "parts": [msg["content"]]
+            })
+
+        # 4. GEMINI CALL
+        genai.configure(api_key=gemini_key)
         full_system_prompt = f"ROLE: {sys_instr or 'Helpful Assistant'} for {b_name}. {system_note} DATA: {knowledge_base}"
         
         model = genai.GenerativeModel(
@@ -244,25 +245,26 @@ def chat():
         bot_reply = response.text
         
         # 5. Save back to Database
-        # Append the new interaction to our internal history tracker
-        chat_history.append({"role": "user", "content": user_message})
-        chat_history.append({"role": "model", "content": bot_reply})
-        
-        # Upsert into database
-        cur.execute("""
-            INSERT INTO chat_sessions (session_id, client_id, messages, updated_at)
-            VALUES (%s, %s, %s, NOW())
-            ON CONFLICT (session_id) 
-            DO UPDATE SET messages = EXCLUDED.messages, updated_at = NOW();
-        """, (session_id, client_id, json.dumps(chat_history)))
-        conn.commit()
+        if session_id:
+            chat_history.append({"role": "user", "content": user_message})
+            chat_history.append({"role": "model", "content": bot_reply})
+            
+            cur.execute("""
+                INSERT INTO chat_sessions (session_id, client_id, messages, updated_at)
+                VALUES (%s, %s, %s, NOW())
+                ON CONFLICT (session_id) 
+                DO UPDATE SET messages = EXCLUDED.messages, updated_at = NOW();
+            """, (session_id, client_id, json.dumps(chat_history)))
+            conn.commit()
         
         return jsonify({"reply": bot_reply})
-        
+
     except Exception as e:
         logging.error(f"AI Error: {str(e)}")
         return jsonify({"reply": f"AI Error: {str(e)}"})
+        
     finally:
+        # We close them HERE, guaranteed to happen no matter what route the code takes
         cur.close()
         conn.close()
 
