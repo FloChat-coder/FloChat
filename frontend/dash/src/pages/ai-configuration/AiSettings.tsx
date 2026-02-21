@@ -4,7 +4,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { 
-  Box, Button, Grid, Paper, Stack, TextField, Typography, Divider, MenuItem, Select, FormControl, InputLabel, InputAdornment, IconButton, CircularProgress
+  Box, Button, Grid, Paper, Stack, TextField, Typography, Divider, MenuItem, Select, FormControl, InputLabel, InputAdornment, IconButton, CircularProgress, SelectChangeEvent
 } from '@mui/material';
 
 
@@ -58,7 +58,7 @@ const AiSettings = () => {
       });
   }, []);
 
-  const handleProviderChange = (e: any) => {
+  const handleProviderChange = (e: SelectChangeEvent) => {
     const newProvider = e.target.value;
     setProvider(newProvider);
     // Auto-select first model of new provider
