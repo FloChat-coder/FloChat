@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timezone
 from dateutil import parser 
+# SMTP Email
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Universal LLM Router
 import litellm 
@@ -210,7 +214,7 @@ def chat():
                 return jsonify({"reply": "I'm not ready yet. Please configure my knowledge base."})
                 
             knowledge_base = cached_content
-            system_note = "Answer based on your knowledge base."
+            system_note = "Answer based STRICTLY on your knowledge base. If the exact answer is not present in the data, do not make it up. Instead, output EXACTLY the word: [HANDOFF_REQUIRED]"
 
         # 2. Fetch or Create Chat History
         chat_history = []
@@ -255,6 +259,11 @@ def chat():
                 api_key=api_key
             )
             bot_reply = response.choices[0].message.content
+            if "[HANDOFF_REQUIRED]" in bot_reply:
+                return jsonify({
+                    "handoff": True, 
+                    "reply": "I'm sorry, I don't have the exact information for that right now. I will escalate this to a human representative."
+                })
         except Exception as e:
             logging.error(f"LiteLLM Error: {str(e)}")
             return jsonify({"reply": f"AI Provider Error: {str(e)}"}), 500
@@ -278,6 +287,140 @@ def chat():
         logging.error(f"Chat Error: {str(e)}")
         return jsonify({"reply": f"Internal Error: {str(e)}"})
         
+    finally:
+        cur.close()
+        conn.close()
+
+# AI Human Handoff
+@app.route('/api/handoff/request', methods=['POST'])
+def request_handoff():
+    data = request.json
+    client_id = data.get('client_id')
+    email = data.get('email')
+    question = data.get('question')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 1. Fetch pending clusters for this client
+        cur.execute("SELECT id, combined_question FROM handoff_clusters WHERE client_id = %s AND status = 'pending'", (client_id,))
+        pending_clusters = cur.fetchall()
+        
+        assigned_cluster_id = None
+        combined_q = question
+        
+        # 2. Ask LLM to cluster the question
+        if pending_clusters:
+            cur.execute("SELECT api_key, model_name FROM clients WHERE client_id = %s", (client_id,))
+            client_config = cur.fetchone()
+            
+            if client_config and client_config[0]:
+                cluster_prompt = f"""
+                Existing Unanswered Questions: {[{'id': c[0], 'question': c[1]} for c in pending_clusters]}
+                New Question: "{question}"
+                
+                If the new question is semantically identical or a direct variation of an existing question, return the ID of that existing question and provide a new 'combined_question' that merges their details (e.g., if existing is "red?" and new is "black?", combined is "red, black?").
+                If it is a completely new topic, return id: null.
+                Respond strictly in JSON format: {{"cluster_id": id_or_null, "combined_question": "string"}}
+                """
+                
+                try:
+                    res = completion(
+                        model=client_config[1],
+                        messages=[{"role": "user", "content": cluster_prompt}],
+                        api_key=client_config[0],
+                        response_format={"type": "json_object"}
+                    )
+                    clustering_result = json.loads(res.choices[0].message.content)
+                    assigned_cluster_id = clustering_result.get('cluster_id')
+                    if clustering_result.get('combined_question'):
+                        combined_q = clustering_result.get('combined_question')
+                except Exception as e:
+                    logging.error(f"Clustering failed: {e}")
+
+        # 3. Insert or Update DB
+        if assigned_cluster_id:
+            cur.execute("UPDATE handoff_clusters SET combined_question = %s, updated_at = NOW() WHERE id = %s", (combined_q, assigned_cluster_id))
+        else:
+            cur.execute("INSERT INTO handoff_clusters (client_id, combined_question) VALUES (%s, %s) RETURNING id", (client_id, question))
+            assigned_cluster_id = cur.fetchone()[0]
+            
+        cur.execute("INSERT INTO handoff_users (cluster_id, user_email, original_question) VALUES (%s, %s, %s)", (assigned_cluster_id, email, question))
+        conn.commit()
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/api/handoff/inbox', methods=['GET'])
+def get_inbox():
+    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT c.id, c.combined_question, c.created_at, COUNT(u.id) as user_count 
+        FROM handoff_clusters c 
+        LEFT JOIN handoff_users u ON c.id = u.cluster_id 
+        WHERE c.client_id = %s AND c.status = 'pending'
+        GROUP BY c.id ORDER BY c.created_at DESC
+    """, (session['client_id'],))
+    
+    results = [{"id": r[0], "question": r[1], "date": r[2], "users": r[3]} for r in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return jsonify(results)
+
+@app.route('/api/handoff/resolve', methods=['POST'])
+def resolve_handoff():
+    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.json
+    cluster_id = data.get('cluster_id')
+    answer = data.get('answer')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Update Cluster
+        cur.execute("UPDATE handoff_clusters SET status = 'resolved', answer = %s WHERE id = %s AND client_id = %s", (answer, cluster_id, session['client_id']))
+        
+        # Get Users to email
+        cur.execute("SELECT user_email, original_question FROM handoff_users WHERE cluster_id = %s", (cluster_id,))
+        users = cur.fetchall()
+        
+        # --- SEND EMAILS ---
+        smtp_server = os.getenv("SMTP_SERVER")
+        smtp_port = int(os.getenv("SMTP_PORT", 587))
+        smtp_user = os.getenv("SMTP_USER")
+        smtp_pass = os.getenv("SMTP_PASS")
+        
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        
+        for email, original_q in set(users): # set() removes duplicate emails if a user asked twice
+            msg = MIMEMultipart()
+            msg['From'] = smtp_user
+            msg['To'] = email
+            msg['Subject'] = "Follow-up regarding your recent question"
+            
+            body = f"Hello,\n\nYou recently asked us: '{original_q}'.\n\nOur team has reviewed your request, and here is the answer:\n\n{answer}\n\nBest regards,\nSupport Team"
+            msg.attach(MIMEText(body, 'plain'))
+            server.send_message(msg)
+            
+        server.quit()
+        conn.commit()
+        return jsonify({"success": True})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         cur.close()
         conn.close()

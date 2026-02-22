@@ -15,6 +15,9 @@ const GoogleSheets = lazy(() => import('pages/integrations/GoogleSheets'));
 // 3. AI Configuration Imports
 const AiSettings = lazy(() => import('pages/ai-configuration/AiSettings'));
 
+// 4. Inbox
+const Inbox = lazy(() => import('pages/inbox/Inbox'));
+
 // Fallback App Component
 const App = lazy(() => import('App'));
 
@@ -55,6 +58,10 @@ const router = createBrowserRouter(
               // CHANGED: Only one path mapped to AiSettings now
               path: paths.aiSettings,
               element: <AiSettings />,
+            },
+            {
+              path: paths.inbox,
+              element: <Inbox />,
             },
           ],
         },
