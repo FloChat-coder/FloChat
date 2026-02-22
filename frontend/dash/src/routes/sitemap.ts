@@ -50,6 +50,12 @@ const sitemap: MenuItem[] = [
     icon: 'mingcute:ai-fill',
   },
   {
+    id: 'inbox',
+    subheader: 'Inbox',
+    path: paths.inbox, // Map this to your router paths
+    icon: 'mingcute:inbox-fill',
+  },
+  {
     id: 'leads',
     subheader: 'Leads & Chats',
     path: paths.leads,
