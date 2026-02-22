@@ -31,8 +31,8 @@ const Inbox = () => {
       if (!res.ok) throw new Error('Failed to fetch inbox data');
       const data = await res.json();
       setClusters(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
     }
@@ -66,8 +66,8 @@ const Inbox = () => {
         return newState;
       });
 
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setSubmitting((prev) => ({ ...prev, [clusterId]: false }));
     }

@@ -15,6 +15,7 @@ export default {
   },
   aiSettings: `/${rootPaths.pagesRoot}/ai-settings`,
   leads: `/${rootPaths.pagesRoot}/leads`,
+  inbox: `/${rootPaths.pagesRoot}/inbox`,
   analytics: `/${rootPaths.pagesRoot}/analytics`,
   widget: `/${rootPaths.pagesRoot}/widget`,
   settings: `/${rootPaths.pagesRoot}/settings`,
