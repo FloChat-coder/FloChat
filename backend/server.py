@@ -379,45 +379,56 @@ def get_inbox():
 def resolve_handoff():
     if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
     
-    data = request.json
+    data = request.json or {}
     cluster_id = data.get('cluster_id')
     answer = data.get('answer')
+    
+    if not cluster_id or not answer:
+        return jsonify({"error": "Missing cluster_id or answer"}), 400
     
     conn = get_db_connection()
     cur = conn.cursor()
     
     try:
-        # Update Cluster
+        # 1. Update Database First
         cur.execute("UPDATE handoff_clusters SET status = 'resolved', answer = %s WHERE id = %s AND client_id = %s", (answer, cluster_id, session['client_id']))
         
-        # Get Users to email
+        # 2. Get Users to email
         cur.execute("SELECT user_email, original_question FROM handoff_users WHERE cluster_id = %s", (cluster_id,))
         users = cur.fetchall()
         
-        # --- SEND EMAILS ---
-        # Look for both variations of the env vars just in case
-        smtp_user = os.getenv("SMTP_USER") or os.getenv("SMTP_EMAIL")
-        smtp_pass = os.getenv("SMTP_PASS") or os.getenv("SMTP_PASSWORD")
+        # 3. COMMIT DB immediately. Even if email fails, it clears from the dashboard.
+        conn.commit() 
         
-        # Use a 'with' block for SSL, just like the verification email!
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(smtp_user, smtp_pass)
+        # 4. SEND EMAILS
+        if users:
+            smtp_user = os.getenv("SMTP_USER") or os.getenv("SMTP_EMAIL")
+            smtp_pass = os.getenv("SMTP_PASS") or os.getenv("SMTP_PASSWORD")
             
-            for email, original_q in set(users): # set() removes duplicate emails if a user asked twice
-                msg = MIMEMultipart()
-                msg['From'] = smtp_user
-                msg['To'] = email
-                msg['Subject'] = "Follow-up regarding your recent question"
+            if not smtp_user or not smtp_pass:
+                raise Exception("SMTP credentials (SMTP_EMAIL/SMTP_PASSWORD) are missing on the server.")
+            
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                server.login(smtp_user, smtp_pass)
                 
-                body = f"Hello,\n\nYou recently asked us: '{original_q}'.\n\nOur team has reviewed your request, and here is the answer:\n\n{answer}\n\nBest regards,\nSupport Team"
-                msg.attach(MIMEText(body, 'plain'))
-                server.send_message(msg)
-            
-        conn.commit()
+                for email, original_q in set(users):
+                    try:
+                        msg = MIMEMultipart()
+                        msg['From'] = smtp_user
+                        msg['To'] = email
+                        msg['Subject'] = "Follow-up regarding your recent question"
+                        
+                        body = f"Hello,\n\nYou recently asked us: '{original_q}'.\n\nOur team has reviewed your request, and here is the answer:\n\n{answer}\n\nBest regards,\nSupport Team"
+                        msg.attach(MIMEText(body, 'plain'))
+                        server.send_message(msg)
+                    except Exception as email_err:
+                        logging.error(f"Failed to send email to {email}: {str(email_err)}")
+                        
         return jsonify({"success": True})
         
     except Exception as e:
         conn.rollback()
+        logging.error(f"Resolve Handoff Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         cur.close()

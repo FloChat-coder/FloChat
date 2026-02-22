@@ -54,7 +54,10 @@ const Inbox = () => {
         body: JSON.stringify({ cluster_id: clusterId, answer: answerText }),
       });
 
-      if (!res.ok) throw new Error('Failed to submit answer');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown server error' }));
+        throw new Error(`Backend Error: ${errorData.error || 'Failed to submit answer'}`);
+      }
 
       // Remove the resolved cluster from the UI
       setClusters((prev) => prev.filter((c) => c.id !== clusterId));
