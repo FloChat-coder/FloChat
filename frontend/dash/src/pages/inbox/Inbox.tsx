@@ -55,8 +55,22 @@ const Inbox = () => {
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown server error' }));
-        throw new Error(`Backend Error: ${errorData.error || 'Failed to submit answer'}`);
+        let errorMsg = 'Unknown server error';
+        try {
+          // Check if the backend gave us JSON
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await res.json();
+            errorMsg = errorData.error || errorMsg;
+          } else {
+            // If it's HTML, grab the first 80 characters so we can see what the hosting provider is saying
+            const textData = await res.text();
+            errorMsg = textData.substring(0, 80) + "..."; 
+          }
+        } catch(e) {
+          errorMsg = "Failed to parse error response.";
+        }
+        throw new Error(`Backend Error: ${errorMsg}`);
       }
 
       // Remove the resolved cluster from the UI

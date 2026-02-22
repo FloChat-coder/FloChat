@@ -377,62 +377,69 @@ def get_inbox():
 
 @app.route('/api/handoff/resolve', methods=['POST'])
 def resolve_handoff():
-    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
-    
-    data = request.json or {}
-    cluster_id = data.get('cluster_id')
-    answer = data.get('answer')
-    
-    if not cluster_id or not answer:
-        return jsonify({"error": "Missing cluster_id or answer"}), 400
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
     try:
-        # 1. Update Database First
-        cur.execute("UPDATE handoff_clusters SET status = 'resolved', answer = %s WHERE id = %s AND client_id = %s", (answer, cluster_id, session['client_id']))
+        # 1. Check Auth
+        if 'client_id' not in session: 
+            return jsonify({"error": "Unauthorized"}), 401
         
-        # 2. Get Users to email
+        # 2. Force silent JSON parsing to prevent Flask from throwing HTML 400 errors
+        data = request.get_json(force=True, silent=True) or {}
+        cluster_id = data.get('cluster_id')
+        answer = data.get('answer')
+        
+        if not cluster_id or not answer:
+            return jsonify({"error": "Missing cluster_id or answer"}), 400
+        
+        # 3. Safe Database Connection
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({"error": "Database connection failed"}), 500
+            
+        cur = conn.cursor()
+        
+        # 4. Execute DB Updates
+        cur.execute("UPDATE handoff_clusters SET status = 'resolved', answer = %s WHERE id = %s AND client_id = %s", (answer, cluster_id, session['client_id']))
         cur.execute("SELECT user_email, original_question FROM handoff_users WHERE cluster_id = %s", (cluster_id,))
         users = cur.fetchall()
         
-        # 3. COMMIT DB immediately. Even if email fails, it clears from the dashboard.
-        conn.commit() 
+        # 5. COMMIT IMMEDIATELY so the UI clears regardless of email success
+        conn.commit()
         
-        # 4. SEND EMAILS
-        if users:
-            smtp_user = os.getenv("SMTP_USER") or os.getenv("SMTP_EMAIL")
-            smtp_pass = os.getenv("SMTP_PASS") or os.getenv("SMTP_PASSWORD")
-            
-            if not smtp_user or not smtp_pass:
-                raise Exception("SMTP credentials (SMTP_EMAIL/SMTP_PASSWORD) are missing on the server.")
-            
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-                server.login(smtp_user, smtp_pass)
+        # 6. Safe Email Sending (Won't crash the server if it fails)
+        smtp_user = os.getenv("SMTP_USER") or os.getenv("SMTP_EMAIL")
+        smtp_pass = os.getenv("SMTP_PASS") or os.getenv("SMTP_PASSWORD")
+        
+        if users and smtp_user and smtp_pass:
+            try:
+                # Add a 10-second timeout to prevent Proxy 504 Gateway Timeouts
+                with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as server:
+                    server.login(smtp_user, smtp_pass)
+                    
+                    for email, original_q in set(users):
+                        try:
+                            msg = MIMEMultipart()
+                            msg['From'] = smtp_user
+                            msg['To'] = email
+                            msg['Subject'] = "Follow-up regarding your recent question"
+                            
+                            body = f"Hello,\n\nYou recently asked us: '{original_q}'.\n\nOur team has reviewed your request, and here is the answer:\n\n{answer}\n\nBest regards,\nSupport Team"
+                            msg.attach(MIMEText(body, 'plain'))
+                            server.send_message(msg)
+                        except Exception as e:
+                            logging.error(f"Failed to email {email}: {e}")
+            except Exception as e:
+                logging.error(f"SMTP Login/Connection Error: {e}")
+                # We intentionally don't return a 500 here because the DB update worked!
                 
-                for email, original_q in set(users):
-                    try:
-                        msg = MIMEMultipart()
-                        msg['From'] = smtp_user
-                        msg['To'] = email
-                        msg['Subject'] = "Follow-up regarding your recent question"
-                        
-                        body = f"Hello,\n\nYou recently asked us: '{original_q}'.\n\nOur team has reviewed your request, and here is the answer:\n\n{answer}\n\nBest regards,\nSupport Team"
-                        msg.attach(MIMEText(body, 'plain'))
-                        server.send_message(msg)
-                    except Exception as email_err:
-                        logging.error(f"Failed to send email to {email}: {str(email_err)}")
-                        
         return jsonify({"success": True})
         
     except Exception as e:
-        conn.rollback()
-        logging.error(f"Resolve Handoff Error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Fatal Resolve Error: {str(e)}")
+        return jsonify({"error": f"Server exception: {str(e)}"}), 500
     finally:
-        cur.close()
-        conn.close()
+        # Safely close connections
+        if 'cur' in locals(): cur.close()
+        if 'conn' in locals() and conn: conn.close()
 
 # --- AI CONFIGURATION API ---
 
