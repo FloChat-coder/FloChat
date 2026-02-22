@@ -72,11 +72,13 @@ const Inbox = () => {
         }
         throw new Error(`Backend Error: ${errorMsg}`);
       }
+      const responseData = await res.json();
+      if (responseData.email_status !== "Success") {
+        alert(`Question resolved in dashboard, BUT email failed to send: ${responseData.email_status}`);
+      }
 
       // Remove the resolved cluster from the UI
       setClusters((prev) => prev.filter((c) => c.id !== clusterId));
-      
-      // Clear the answer text from state
       setAnswers((prev) => {
         const newState = { ...prev };
         delete newState[clusterId];
