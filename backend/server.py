@@ -395,26 +395,24 @@ def resolve_handoff():
         users = cur.fetchall()
         
         # --- SEND EMAILS ---
-        smtp_server = os.getenv("SMTP_SERVER")
-        smtp_port = int(os.getenv("SMTP_PORT", 587))
-        smtp_user = os.getenv("SMTP_USER")
-        smtp_pass = os.getenv("SMTP_PASS")
+        # Look for both variations of the env vars just in case
+        smtp_user = os.getenv("SMTP_USER") or os.getenv("SMTP_EMAIL")
+        smtp_pass = os.getenv("SMTP_PASS") or os.getenv("SMTP_PASSWORD")
         
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        
-        for email, original_q in set(users): # set() removes duplicate emails if a user asked twice
-            msg = MIMEMultipart()
-            msg['From'] = smtp_user
-            msg['To'] = email
-            msg['Subject'] = "Follow-up regarding your recent question"
+        # Use a 'with' block for SSL, just like the verification email!
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(smtp_user, smtp_pass)
             
-            body = f"Hello,\n\nYou recently asked us: '{original_q}'.\n\nOur team has reviewed your request, and here is the answer:\n\n{answer}\n\nBest regards,\nSupport Team"
-            msg.attach(MIMEText(body, 'plain'))
-            server.send_message(msg)
+            for email, original_q in set(users): # set() removes duplicate emails if a user asked twice
+                msg = MIMEMultipart()
+                msg['From'] = smtp_user
+                msg['To'] = email
+                msg['Subject'] = "Follow-up regarding your recent question"
+                
+                body = f"Hello,\n\nYou recently asked us: '{original_q}'.\n\nOur team has reviewed your request, and here is the answer:\n\n{answer}\n\nBest regards,\nSupport Team"
+                msg.attach(MIMEText(body, 'plain'))
+                server.send_message(msg)
             
-        server.quit()
         conn.commit()
         return jsonify({"success": True})
         
@@ -502,6 +500,31 @@ def save_ai_settings():
     
     return jsonify({"success": True, "message": "Settings saved successfully"})
 
+def send_verification_email(user_email, token):
+    smtp_user = os.getenv("SMTP_EMAIL") or os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS")
+
+    if not smtp_user or not smtp_pass:
+        logging.error("❌ SMTP Credentials missing. Cannot send email.")
+        return
+
+    # Generate the verification URL
+    verify_url = url_for('verify_email', token=token, _external=True)
+    
+    msg = MIMEText(f"Welcome to FloChat!\n\nPlease click here to verify your account:\n{verify_url}")
+    msg['Subject'] = "Verify your FloChat Account"
+    msg['From'] = smtp_user
+    msg['To'] = user_email
+
+    try:
+        # Using Gmail's standard SSL port
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        logging.info(f"✅ Verification email sent to {user_email}")
+    except Exception as e:
+        logging.error(f"❌ Verification Email Failed: {e}")
+
 @app.route('/api/login', methods=['POST'])
 def api_login():
     data = request.json
@@ -520,6 +543,10 @@ def api_login():
 
     if not stored_hash: return jsonify({"error": "Please log in with Google"}), 400
     if not check_password_hash(stored_hash, password): return jsonify({"error": "Invalid credentials"}), 401
+
+    # --- NEW: Check if email is verified ---
+    if not is_verified:
+        return jsonify({"error": "Please verify your email first. Check your inbox."}), 403
 
     session['client_id'] = client_id
     return jsonify({"message": "Login successful", "redirect": "/dashboard"})
@@ -558,7 +585,40 @@ def register():
         cur.close()
         conn.close()
 
-    return jsonify({"message": "Registration successful."})
+    # --- NEW: Send Verification Email ---
+    send_verification_email(email, token)
+
+    return jsonify({"message": "Registration successful. Please check your email to verify your account."})
+
+@app.route('/api/verify')
+def verify_email():
+    token = request.args.get('token')
+    if not token: return "Missing token", 400
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Find user by token
+    cur.execute("SELECT client_id FROM clients WHERE verification_token = %s", (token,))
+    row = cur.fetchone()
+    
+    if not row:
+        cur.close()
+        conn.close()
+        return "Invalid or expired token.", 400
+
+    # Verify User
+    client_id = row[0]
+    cur.execute("UPDATE clients SET verified = TRUE, verification_token = NULL WHERE client_id = %s", (client_id,))
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    # Automatically log the user in after clicking the link
+    session['client_id'] = client_id
+    
+    # Redirect straight to the dashboard
+    return redirect('/dashboard')
 
 # --- 3. GOOGLE OAUTH ROUTES ---
 
