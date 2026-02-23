@@ -429,11 +429,13 @@ def resolve_handoff():
         if users:
             if smtp_user and smtp_pass:
                 try:
-                    with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as server:
+                    # Changed from SMTP_SSL(465) to SMTP(587) with starttls()
+                    with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as server:
+                        server.starttls() # Secure the connection
                         server.login(smtp_user, smtp_pass)
                         
                         for user_email, original_q in set(users):
-                            body = f"Hello,\n\nYou recently asked us: '{original_q}'.\n\nOur team has reviewed your request, and here is the answer:\n\n{answer}\n\nBest regards,\nSupport Team"
+                            body = f"Hello,\n\nOur team has reviewed your request regarding: '{original_q}'.\n\nHere is the answer:\n{answer}\n\nBest regards,\nSupport Team"
                             
                             msg = MIMEText(body, 'plain')
                             msg['Subject'] = "Follow-up regarding your recent question"
@@ -568,8 +570,9 @@ def send_verification_email(user_email, token):
     msg['To'] = user_email
 
     try:
-        # Using Gmail's standard SSL port
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        # Changed from SMTP_SSL(465) to SMTP(587) with starttls()
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=10) as server:
+            server.starttls() # Secure the connection
             server.login(smtp_user, smtp_pass)
             server.send_message(msg)
         logging.info(f"✅ Verification email sent to {user_email}")
