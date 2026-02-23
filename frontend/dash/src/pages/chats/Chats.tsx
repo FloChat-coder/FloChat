@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Box, TextField, Button, Typography, Paper, List, ListItem, ListItemText, Modal, Divider, CircularProgress } from '@mui/material';
+import { Box, TextField, Button, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Modal, CircularProgress } from '@mui/material';
 import IconifyIcon from '../../components/base/IconifyIcon';
 
 interface ChatMessage {
@@ -31,10 +31,10 @@ const modalStyle = {
 export default function Chats() {
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<ChatSession[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Default to true so it spins on initial load
   const [selectedChat, setSelectedChat] = useState<ChatSession | null>(null);
 
-  // NEW: Fetch all chats on page load
+  // Fetch all chats on page load
   useEffect(() => {
     handleSearch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -46,7 +46,6 @@ export default function Chats() {
       const res = await fetch('/api/chats/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Passing an empty keyword will now trigger the backend to return all
         body: JSON.stringify({ keyword: keyword.trim() }) 
       });
       const data = await res.json();
@@ -60,6 +59,8 @@ export default function Chats() {
   return (
     <Box p={3}>
       <Typography variant="h4" mb={3}>Global Chat Search</Typography>
+      
+      {/* Search Bar Area */}
       <Box display="flex" gap={2} mb={4}>
         <TextField 
           fullWidth 
@@ -74,28 +75,55 @@ export default function Chats() {
         </Button>
       </Box>
 
-      <Paper>
-        <List>
-          {results.length === 0 && !loading && (
-            <ListItem><ListItemText primary="No chat history found." /></ListItem>
-          )}
-          {results.map((session, idx) => (
-            <div key={session.session_id}>
-              <ListItem 
-                button 
-                onClick={() => setSelectedChat(session)}
-                sx={{ '&:hover': { bgcolor: 'action.hover' } }}
-              >
-                <ListItemText 
-                  primary={`Session Date: ${session.date}`} 
-                  secondary={session.snippet} 
-                />
-              </ListItem>
-              {idx < results.length - 1 && <Divider />}
-            </div>
-          ))}
-        </List>
-      </Paper>
+      {/* Results Table (Matches the Leads Page UI) */}
+      <TableContainer component={Paper}>
+        <Table sx={{ minWidth: 650 }} aria-label="chats table">
+          <TableHead>
+            <TableRow sx={{ backgroundColor: 'action.hover' }}>
+              <TableCell sx={{ fontWeight: 'bold', width: '20%' }}>Session Date</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: '25%' }}>Session ID</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: '40%' }}>Conversation Snippet</TableCell>
+              <TableCell sx={{ fontWeight: 'bold', width: '15%' }}>Action</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center" sx={{ py: 5 }}>
+                  <CircularProgress />
+                </TableCell>
+              </TableRow>
+            ) : results.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                  No chat history found. Try a different keyword or check back later.
+                </TableCell>
+              </TableRow>
+            ) : (
+              results.map((session) => (
+                <TableRow key={session.session_id} sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                  <TableCell>{session.date}</TableCell>
+                  <TableCell>
+                    <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                      {session.session_id}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
+                      "{session.snippet}"
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="outlined" size="small" onClick={() => setSelectedChat(session)}>
+                      View Chat
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {/* Detail View Modal */}
       <Modal open={!!selectedChat} onClose={() => setSelectedChat(null)}>
@@ -123,6 +151,9 @@ export default function Chats() {
                 </Box>
               )
             })}
+            {(!selectedChat?.messages || selectedChat.messages.length === 0) && (
+              <Typography variant="body2" color="textSecondary">No messages found for this session.</Typography>
+            )}
           </Box>
         </Box>
       </Modal>

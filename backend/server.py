@@ -416,6 +416,56 @@ def get_leads_list():
         cur.close()
         conn.close()
 
+@app.route('/api/chats/search', methods=['POST'])
+def search_chats():
+    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
+    keyword = request.json.get('keyword', '').strip()
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        if keyword:
+            search_pattern = f"%{keyword}%"
+            cur.execute("""
+                SELECT session_id, created_at, messages 
+                FROM chat_sessions 
+                WHERE client_id = %s AND messages::text ILIKE %s
+                ORDER BY updated_at DESC LIMIT 50
+            """, (session['client_id'], search_pattern))
+        else:
+            # If no keyword, fetch all recent chats
+            cur.execute("""
+                SELECT session_id, created_at, messages 
+                FROM chat_sessions 
+                WHERE client_id = %s
+                ORDER BY updated_at DESC LIMIT 50
+            """, (session['client_id'],))
+            
+        results = []
+        for row in cur.fetchall():
+            session_id, created_at, messages = row
+            snippet = "..."
+            
+            if keyword:
+                for msg in messages:
+                    if keyword.lower() in msg.get('content', '').lower():
+                        snippet = msg['content'][:100] + "..." if len(msg['content']) > 100 else msg['content']
+                        break
+            else:
+                if messages:
+                    snippet = messages[0]['content'][:100] + "..." if len(messages[0]['content']) > 100 else messages[0]['content']
+                    
+            results.append({
+                "session_id": session_id,
+                "date": created_at.strftime("%Y-%m-%d %H:%M"),
+                "snippet": snippet,
+                "messages": messages
+            })
+        return jsonify(results)
+    finally:
+        cur.close()
+        conn.close()
+
 # AI Human Handoff
 @app.route('/api/handoff/request', methods=['POST'])
 def request_handoff():
