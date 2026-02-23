@@ -78,6 +78,7 @@
     const emailSubmitBtn = document.getElementById('fcEmailSubmit');
 
     let lastUserQuestion = "";
+    let popupMode = null;
 
     function toggle() { 
         windowEl.style.display = windowEl.style.display === 'flex' ? 'none' : 'flex'; 
@@ -89,7 +90,7 @@
         const text = inputEl.value.trim();
         if (!text) return;
         
-        lastUserQuestion = text; // Save the question for handoff
+        lastUserQuestion = text; 
         inputEl.value = '';
         msgsEl.innerHTML += `<div class="fc-msg fc-user">${text}</div>`;
         msgsEl.scrollTop = msgsEl.scrollHeight;
@@ -104,10 +105,15 @@
             
             msgsEl.innerHTML += `<div class="fc-msg fc-bot">${data.reply}</div>`;
             
-            // --- HANDOFF LOGIC ---
+            // --- POPUP LOGIC ---
             if (data.handoff) {
+                popupMode = 'handoff';
                 emailPopupEl.style.display = 'flex';
-                inputEl.disabled = true; // Disable chat input until email is provided
+                inputEl.disabled = true; 
+            } else if (data.lead) {
+                popupMode = 'lead';
+                emailPopupEl.style.display = 'flex';
+                inputEl.disabled = true; 
             }
             
         } catch (e) {
@@ -123,44 +129,47 @@
     emailSubmitBtn.onclick = async () => {
         const email = emailInputEl.value.trim();
         
-        // Basic email validation
         if(!email || !email.includes('@') || !email.includes('.')) {
             alert("Please enter a valid email address.");
             return;
         }
         
-        // Show loading state
         emailSubmitBtn.innerText = "Submitting...";
         emailSubmitBtn.disabled = true;
         emailInputEl.disabled = true;
         
         try {
-            // Transform chat URL to handoff URL automatically
-            const handoffUrl = API_URL.replace('/chat', '/handoff/request');
+            // Dynamically route to the correct backend endpoint based on what triggered the popup
+            const targetEndpoint = popupMode === 'handoff' ? '/handoff/request' : '/leads/request';
+            const finalUrl = API_URL.replace('/chat', targetEndpoint);
             
-            await fetch(handoffUrl, {
+            await fetch(finalUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     client_id: clientId, 
+                    session_id: sessionId, // Added for Leads tracking
                     email: email, 
                     question: lastUserQuestion 
                 })
             });
             
-            // Reset UI on success
             emailPopupEl.style.display = 'none';
-            msgsEl.innerHTML += `<div class="fc-msg fc-bot">Thank you! Our support team will review your question and email you shortly.</div>`;
+            if(popupMode === 'handoff') {
+                msgsEl.innerHTML += `<div class="fc-msg fc-bot">Thank you! Our support team will review your question and email you shortly.</div>`;
+            } else {
+                msgsEl.innerHTML += `<div class="fc-msg fc-bot">Thank you! We'll notify you as soon as possible.</div>`;
+            }
             emailInputEl.value = ""; 
         } catch (e) {
-            console.error("Handoff submission error:", e);
+            console.error("Submission error:", e);
             alert("There was an error submitting your email. Please try again.");
         } finally {
-            // Restore button/input states
             emailSubmitBtn.innerText = "Submit";
             emailSubmitBtn.disabled = false;
             emailInputEl.disabled = false;
-            inputEl.disabled = false; // Unlock standard chat
+            inputEl.disabled = false; 
+            popupMode = null; // Reset mode
             msgsEl.scrollTop = msgsEl.scrollHeight;
         }
     };

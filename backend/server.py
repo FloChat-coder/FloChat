@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import secrets
 import psycopg2
@@ -17,7 +18,7 @@ from email.mime.multipart import MIMEMultipart
 
 # Universal LLM Router
 import litellm 
-from litellm import completion, token_counter, get_max_tokens
+from litellm import completion, token_counter, get_max_tokens, completion_cost
 
 # Google Libraries (Kept for Drive/Sheets sync)
 from google.oauth2.credentials import Credentials
@@ -224,7 +225,10 @@ def chat():
             "if the question is about a product you MUST answer based STRICTLY on " \
             "the DATA provided above. If the exact answer is not present in the DATA, " \
             "do not guess, do not apologize, and do not explain yourself. Instead, you " \
-            "MUST output exactly and only this string: [HANDOFF_REQUIRED]"
+            "MUST output exactly and only this string: [HANDOFF_REQUIRED]. " \
+            "If a user asks for a product that is out of stock or not available, or if they " \
+            "don't find what they are looking for but show purchasing intent, output EXACTLY " \
+            "this string at the end of your response: [LEAD_REQUIRED]"
 
         # 2. Fetch or Create Chat History
         chat_history = []
@@ -272,6 +276,9 @@ def chat():
             logging.warning(f"Could not calculate tokens for {model_name}: {e}")
 
         # 6. LITELLM API CALL
+        msg_tokens = 0
+        msg_cost = 0.0
+        
         try:
             response = completion(
                 model=model_name,
@@ -279,44 +286,88 @@ def chat():
                 api_key=api_key
             )
             bot_reply = response.choices[0].message.content
-            if "[HANDOFF_REQUIRED]" in bot_reply.lower():
-                return jsonify({
-                    "handoff": True, 
-                    "reply": "I'm sorry, I don't have the exact information for that right now. I will escalate this to a human representative."
-                })
+            
+            # Safely calculate tokens and cost for this specific turn
+            if hasattr(response, 'usage') and response.usage:
+                msg_tokens = response.usage.total_tokens
+                
+            try:
+                # completion_cost can sometimes throw errors if the model isn't mapped, so we nest it
+                msg_cost = completion_cost(completion_response=response) or 0.0
+            except Exception as cost_err:
+                logging.warning(f"LiteLLM cost calculation error for {model_name}: {cost_err}")
+                msg_cost = 0.0
+
         except Exception as e:
             logging.error(f"LiteLLM Error: {str(e)}")
             return jsonify({"reply": f"AI Provider Error: {str(e)}"}), 500
         
         is_handoff = False
+        is_lead = False
         frontend_reply = bot_reply
 
-        # If the AI triggered the handoff, we replace its text with our polite fallback message!
+        # Handle Handoff
         if "[handoff_required]" in bot_reply.lower():
             is_handoff = True
             frontend_reply = "I'm sorry, I don't have the exact information for that right now. I will escalate this to a human representative."
-        
-        # 7. Save back to Database
+            
+        # Handle Lead Capture Trigger
+        elif "[lead_required]" in bot_reply.lower():
+            is_lead = True
+            # Clean the tag out of the message so the user just sees the bot's natural response
+            frontend_reply = bot_reply.lower().replace("[lead_required]", "").strip()
+
+        # 7. Save back to Database 
         if session_id:
             chat_history.append({"role": "user", "content": user_message})
             chat_history.append({"role": "model", "content": frontend_reply})
             
             cur.execute("""
-                INSERT INTO chat_sessions (session_id, client_id, messages, updated_at)
-                VALUES (%s, %s, %s, NOW())
+                INSERT INTO chat_sessions (session_id, client_id, messages, total_tokens, estimated_cost, model_used, handoff_triggered, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
                 ON CONFLICT (session_id) 
-                DO UPDATE SET messages = EXCLUDED.messages, updated_at = NOW();
-            """, (session_id, client_id, json.dumps(chat_history)))
+                DO UPDATE SET 
+                    messages = EXCLUDED.messages,
+                    total_tokens = chat_sessions.total_tokens + EXCLUDED.total_tokens,
+                    estimated_cost = chat_sessions.estimated_cost + EXCLUDED.estimated_cost,
+                    model_used = EXCLUDED.model_used,
+                    handoff_triggered = chat_sessions.handoff_triggered OR EXCLUDED.handoff_triggered,
+                    updated_at = NOW();
+            """, (session_id, client_id, json.dumps(chat_history), msg_tokens, msg_cost, model_name, is_handoff))
             conn.commit()
+            
+        # Return the appropriate flags to the widget
         if is_handoff:
             return jsonify({"handoff": True, "reply": frontend_reply})
+        elif is_lead:
+            return jsonify({"lead": True, "reply": frontend_reply})
         else:
             return jsonify({"reply": frontend_reply})
-
-    except Exception as e:
-        logging.error(f"Chat Error: {str(e)}")
-        return jsonify({"reply": f"Internal Error: {str(e)}"})
         
+    finally:
+        cur.close()
+        conn.close()
+
+
+@app.route('/api/leads/request', methods=['POST'])
+def capture_lead():
+    data = request.json
+    client_id = data.get('client_id')
+    email = data.get('email')
+    session_id = data.get('session_id')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO leads (client_id, session_id, email) VALUES (%s, %s, %s)",
+            (client_id, session_id, email)
+        )
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
     finally:
         cur.close()
         conn.close()

@@ -18,6 +18,9 @@ const AiSettings = lazy(() => import('pages/ai-configuration/AiSettings'));
 // 4. Inbox
 const Inbox = lazy(() => import('pages/inbox/Inbox'));
 
+// Chats
+const Chats = lazy(() => import('pages/chats/Chats'));
+
 // Fallback App Component
 const App = lazy(() => import('App'));
 
@@ -62,6 +65,10 @@ const router = createBrowserRouter(
             {
               path: paths.inbox,
               element: <Inbox />,
+            },
+            {
+              path: paths.chats,
+              element: <Chats />,
             },
           ],
         },
