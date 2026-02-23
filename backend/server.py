@@ -230,9 +230,19 @@ def chat():
 
         # 3. Apply Sliding Window 
         recent_history = chat_history[-6:] 
+
+        # 4. Fetch Resolved Handoffs for Context Learning
+        cur.execute("SELECT combined_question, answer FROM handoff_clusters WHERE client_id = %s AND status = 'resolved'", (client_id,))
+        resolved_tickets = cur.fetchall()
+        
+        learned_context = ""
+        if resolved_tickets:
+            learned_context = "\n\nPREVIOUSLY ANSWERED QUESTIONS (If the user asks something similar to these, answer using this exact information):\n"
+            for q, a in resolved_tickets:
+                learned_context += f"Q: {q}\nA: {a}\n\n"
         
         # 4. Format messages for LiteLLM
-        full_system_prompt = f"ROLE: {sys_instr or 'Helpful Assistant'} for {b_name}.\n\nDATA:\n{knowledge_base}\n\n{system_note}"
+        full_system_prompt = f"ROLE: {sys_instr or 'Helpful Assistant'} for {b_name}.\n\nDATA:\n{knowledge_base}{learned_context}\n\n{system_note}"
         
         llm_messages = [{"role": "system", "content": full_system_prompt}]
         for msg in recent_history:
