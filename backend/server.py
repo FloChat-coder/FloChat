@@ -214,7 +214,11 @@ def chat():
                 return jsonify({"reply": "I'm not ready yet. Please configure my knowledge base."})
                 
             knowledge_base = cached_content
-            system_note = "Answer based STRICTLY on your knowledge base. If the exact answer is not present in the data, do not make it up. Instead, output EXACTLY the word: [HANDOFF_REQUIRED]"
+            system_note = "CRITICAL INSTRUCTION: You will answer greetings but " \
+            "if the question is about a product you MUST answer based STRICTLY on " \
+            "the DATA provided above. If the exact answer is not present in the DATA, " \
+            "do not guess, do not apologize, and do not explain yourself. Instead, you " \
+            "MUST output exactly and only this string: [HANDOFF_REQUIRED]"
 
         # 2. Fetch or Create Chat History
         chat_history = []
@@ -228,7 +232,7 @@ def chat():
         recent_history = chat_history[-6:] 
         
         # 4. Format messages for LiteLLM
-        full_system_prompt = f"ROLE: {sys_instr or 'Helpful Assistant'} for {b_name}. {system_note} DATA: {knowledge_base}"
+        full_system_prompt = f"ROLE: {sys_instr or 'Helpful Assistant'} for {b_name}.\n\nDATA:\n{knowledge_base}\n\n{system_note}"
         
         llm_messages = [{"role": "system", "content": full_system_prompt}]
         for msg in recent_history:
@@ -259,7 +263,7 @@ def chat():
                 api_key=api_key
             )
             bot_reply = response.choices[0].message.content
-            if "[HANDOFF_REQUIRED]" in bot_reply:
+            if "[HANDOFF_REQUIRED]" in bot_reply.lower():
                 return jsonify({
                     "handoff": True, 
                     "reply": "I'm sorry, I don't have the exact information for that right now. I will escalate this to a human representative."
