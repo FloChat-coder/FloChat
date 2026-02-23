@@ -377,8 +377,12 @@ def get_inbox():
 
 @app.route('/api/handoff/resolve', methods=['POST'])
 def resolve_handoff():
+    # 1. Initialize variables outside the try block so they always exist
+    conn = None
+    cur = None
+    
     try:
-        # 1. Check Auth
+        # 2. Check Auth
         if 'client_id' not in session: 
             return jsonify({"error": "Unauthorized"}), 401
         
@@ -389,7 +393,7 @@ def resolve_handoff():
         if not cluster_id or not answer:
             return jsonify({"error": "Missing cluster_id or answer"}), 400
         
-        # 2. Database Connection & Updates
+        # 3. Database Connection & Updates
         conn = get_db_connection()
         if not conn:
             return jsonify({"error": "Database connection failed"}), 500
@@ -399,25 +403,24 @@ def resolve_handoff():
         cur.execute("SELECT user_email, original_question FROM handoff_users WHERE cluster_id = %s", (cluster_id,))
         users = cur.fetchall()
         
+        # COMMIT IMMEDIATELY so it clears from the dashboard
         conn.commit()
         
-        # 3. --- EMAIL SENDING (Matches your proven verification logic) ---
+        # 4. --- EMAIL SENDING ---
         email_status = "Success"
         
-        # Look for credentials
         smtp_user = os.getenv("SMTP_EMAIL") or os.getenv("SMTP_USER")
         smtp_pass = os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS")
         
         if users:
             if smtp_user and smtp_pass:
                 try:
-                    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                    with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as server:
                         server.login(smtp_user, smtp_pass)
                         
                         for user_email, original_q in set(users):
                             body = f"Hello,\n\nYou recently asked us: '{original_q}'.\n\nOur team has reviewed your request, and here is the answer:\n\n{answer}\n\nBest regards,\nSupport Team"
                             
-                            # Using MIMEText exactly like your verification email!
                             msg = MIMEText(body, 'plain')
                             msg['Subject'] = "Follow-up regarding your recent question"
                             msg['From'] = smtp_user
@@ -428,19 +431,34 @@ def resolve_handoff():
                     email_status = f"SMTP Error: {str(e)}"
                     logging.error(f"Handoff Email Failed: {e}")
             else:
-                email_status = "Missing SMTP_EMAIL or SMTP_PASSWORD in .env"
+                email_status = "Missing SMTP_EMAIL or SMTP_PASSWORD in backend environment variables"
         else:
             email_status = "No users found attached to this question."
             
-        # Return success, but pass along the email status!
         return jsonify({"success": True, "email_status": email_status})
         
     except Exception as e:
+        # 5. SAFE ROLLBACK
+        if conn:
+            try:
+                conn.rollback()
+            except Exception as rollback_err:
+                logging.error(f"Rollback failed: {rollback_err}")
+                
         logging.error(f"Fatal Resolve Error: {str(e)}")
-        return jsonify({"error": f"Server exception: {str(e)}"}), 500
+        
+        # 6. FORCE JSON RESPONSE (Prevents Flask from throwing the HTML error page)
+        response = jsonify({"error": f"Server crash prevented: {str(e)}"})
+        response.status_code = 500
+        return response
+        
     finally:
-        if 'cur' in locals(): cur.close()
-        if 'conn' in locals() and conn: conn.close()
+        # 7. SAFE DISCONNECT
+        try:
+            if cur: cur.close()
+            if conn: conn.close()
+        except Exception as close_err:
+            logging.error(f"Error cleanly closing DB connection: {close_err}")
 
 # --- AI CONFIGURATION API ---
 
