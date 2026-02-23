@@ -272,10 +272,18 @@ def chat():
             logging.error(f"LiteLLM Error: {str(e)}")
             return jsonify({"reply": f"AI Provider Error: {str(e)}"}), 500
         
+        is_handoff = False
+        frontend_reply = bot_reply
+
+        # If the AI triggered the handoff, we replace its text with our polite fallback message!
+        if "[handoff_required]" in bot_reply.lower():
+            is_handoff = True
+            frontend_reply = "I'm sorry, I don't have the exact information for that right now. I will escalate this to a human representative."
+        
         # 7. Save back to Database
         if session_id:
             chat_history.append({"role": "user", "content": user_message})
-            chat_history.append({"role": "model", "content": bot_reply})
+            chat_history.append({"role": "model", "content": frontend_reply})
             
             cur.execute("""
                 INSERT INTO chat_sessions (session_id, client_id, messages, updated_at)
@@ -284,8 +292,10 @@ def chat():
                 DO UPDATE SET messages = EXCLUDED.messages, updated_at = NOW();
             """, (session_id, client_id, json.dumps(chat_history)))
             conn.commit()
-        
-        return jsonify({"reply": bot_reply})
+        if is_handoff:
+            return jsonify({"handoff": True, "reply": frontend_reply})
+        else:
+            return jsonify({"reply": frontend_reply})
 
     except Exception as e:
         logging.error(f"Chat Error: {str(e)}")
