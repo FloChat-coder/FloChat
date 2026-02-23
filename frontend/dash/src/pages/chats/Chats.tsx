@@ -1,14 +1,12 @@
-import { useState } from 'react';
-import { Box, TextField, Button, Typography, Paper, List, ListItem, ListItemText, Modal, Divider } from '@mui/material';
+import { useState, useEffect } from 'react';
+import { Box, TextField, Button, Typography, Paper, List, ListItem, ListItemText, Modal, Divider, CircularProgress } from '@mui/material';
 import IconifyIcon from '../../components/base/IconifyIcon';
 
-// 1. Define Message Structure
 interface ChatMessage {
   role: string;
   content: string;
 }
 
-// 2. Define Session Structure
 interface ChatSession {
   session_id: string;
   date: string;
@@ -17,7 +15,7 @@ interface ChatSession {
 }
 
 const modalStyle = {
-  position: 'absolute' as const, // FIXED: as const instead of string literal
+  position: 'absolute' as const,
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
@@ -32,20 +30,24 @@ const modalStyle = {
 
 export default function Chats() {
   const [keyword, setKeyword] = useState('');
-  
-  // 3. Remove 'any' types
   const [results, setResults] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedChat, setSelectedChat] = useState<ChatSession | null>(null);
 
+  // NEW: Fetch all chats on page load
+  useEffect(() => {
+    handleSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSearch = async () => {
-    if (!keyword.trim()) return;
     setLoading(true);
     try {
       const res = await fetch('/api/chats/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword })
+        // Passing an empty keyword will now trigger the backend to return all
+        body: JSON.stringify({ keyword: keyword.trim() }) 
       });
       const data = await res.json();
       setResults(data);
@@ -61,21 +63,21 @@ export default function Chats() {
       <Box display="flex" gap={2} mb={4}>
         <TextField 
           fullWidth 
-          label="Search by keyword (e.g., Refund, Issue, Pricing)" 
+          label="Search by keyword (e.g., Refund, Issue, Pricing) or leave blank for all" 
           variant="outlined" 
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
         />
-        <Button variant="contained" onClick={handleSearch} disabled={loading}>
-          <IconifyIcon icon="mdi:search" fontSize={24} /> Search
+        <Button variant="contained" onClick={handleSearch} disabled={loading} sx={{ minWidth: 120 }}>
+          {loading ? <CircularProgress size={24} color="inherit" /> : <><IconifyIcon icon="mdi:search" fontSize={24} sx={{mr: 1}}/> Search</>}
         </Button>
       </Box>
 
       <Paper>
         <List>
           {results.length === 0 && !loading && (
-            <ListItem><ListItemText primary="No results found." /></ListItem>
+            <ListItem><ListItemText primary="No chat history found." /></ListItem>
           )}
           {results.map((session, idx) => (
             <div key={session.session_id}>
@@ -104,7 +106,6 @@ export default function Chats() {
           </Typography>
           
           <Box display="flex" flexDirection="column" gap={1.5}>
-            {/* 4. Type the msg variable */}
             {selectedChat?.messages.map((msg: ChatMessage, i: number) => {
               const isBot = msg.role === 'model' || msg.role === 'assistant';
               return (

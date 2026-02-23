@@ -15,6 +15,8 @@ const GoogleSheets = lazy(() => import('pages/integrations/GoogleSheets'));
 // 3. AI Configuration Imports
 const AiSettings = lazy(() => import('pages/ai-configuration/AiSettings'));
 
+const Leads = lazy(() => import('pages/leads/Leads'));
+
 // 4. Inbox
 const Inbox = lazy(() => import('pages/inbox/Inbox'));
 
@@ -61,6 +63,11 @@ const router = createBrowserRouter(
               // CHANGED: Only one path mapped to AiSettings now
               path: paths.aiSettings,
               element: <AiSettings />,
+            },
+            {
+              // CHANGED: Only one path mapped to AiSettings now
+              path: paths.leads,
+              element: <Leads />,
             },
             {
               path: paths.inbox,
