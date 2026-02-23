@@ -56,6 +56,12 @@ const sitemap: MenuItem[] = [
     icon: 'mingcute:inbox-fill',
   },
   {
+  id: 'chats',
+  subheader: 'Chats',
+  icon: 'material-symbols:search',
+  path: paths.chats,
+},
+  {
     id: 'leads',
     subheader: 'Leads & Chats',
     path: paths.leads,

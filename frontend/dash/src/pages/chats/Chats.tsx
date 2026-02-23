@@ -2,8 +2,22 @@ import { useState } from 'react';
 import { Box, TextField, Button, Typography, Paper, List, ListItem, ListItemText, Modal, Divider } from '@mui/material';
 import IconifyIcon from '../../components/base/IconifyIcon';
 
+// 1. Define Message Structure
+interface ChatMessage {
+  role: string;
+  content: string;
+}
+
+// 2. Define Session Structure
+interface ChatSession {
+  session_id: string;
+  date: string;
+  snippet: string;
+  messages: ChatMessage[];
+}
+
 const modalStyle = {
-  position: 'absolute' as 'absolute',
+  position: 'absolute' as const, // FIXED: as const instead of string literal
   top: '50%',
   left: '50%',
   transform: 'translate(-50%, -50%)',
@@ -18,9 +32,11 @@ const modalStyle = {
 
 export default function Chats() {
   const [keyword, setKeyword] = useState('');
-  const [results, setResults] = useState<any[]>([]);
+  
+  // 3. Remove 'any' types
+  const [results, setResults] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedChat, setSelectedChat] = useState<any | null>(null);
+  const [selectedChat, setSelectedChat] = useState<ChatSession | null>(null);
 
   const handleSearch = async () => {
     if (!keyword.trim()) return;
@@ -88,7 +104,8 @@ export default function Chats() {
           </Typography>
           
           <Box display="flex" flexDirection="column" gap={1.5}>
-            {selectedChat?.messages.map((msg: any, i: number) => {
+            {/* 4. Type the msg variable */}
+            {selectedChat?.messages.map((msg: ChatMessage, i: number) => {
               const isBot = msg.role === 'model' || msg.role === 'assistant';
               return (
                 <Box 

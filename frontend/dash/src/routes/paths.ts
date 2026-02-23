@@ -5,7 +5,7 @@ export const rootPaths = {
   authRoot: 'authentication'
 };
 
-export default {
+const paths = {
   dashboard: `/${rootPaths.pagesRoot}/dashboard`,
   
   // FloChat Internal Paths
@@ -15,6 +15,7 @@ export default {
   },
   aiSettings: `/${rootPaths.pagesRoot}/ai-settings`,
   leads: `/${rootPaths.pagesRoot}/leads`,
+  chats: `/${rootPaths.pagesRoot}/chats`,
   inbox: `/${rootPaths.pagesRoot}/inbox`,
   analytics: `/${rootPaths.pagesRoot}/analytics`,
   widget: `/${rootPaths.pagesRoot}/widget`,
@@ -26,3 +27,5 @@ export default {
 
   404: `/${rootPaths.errorRoot}/404`,
 };
+
+export default paths;

@@ -5,14 +5,29 @@ import TopCards from 'components/sections/dashboard/top-cards';
 import WebsiteVisitors from 'components/sections/dashboard/website-visitors';
 import TopCard from 'components/sections/dashboard/top-cards/TopCard';
 
+// 1. Add Interface
+interface MetricsData {
+  total_sessions: number;
+  total_messages: number;
+  avg_messages_per_session: number;
+  total_tokens: number;
+  total_cost: number;
+  top_model: string;
+  resolution_rate: number;
+  handoff_rate: number;
+  lead_capture_count: number;
+  error?: string;
+}
+
 const Dashboard = () => {
-  const [metrics, setMetrics] = useState<any>(null);
+  // 2. Apply interface
+  const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/analytics/metrics')
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: MetricsData) => {
         if (!data.error) setMetrics(data);
         setLoading(false);
       })
@@ -33,40 +48,16 @@ const Dashboard = () => {
         ) : metrics ? (
           <>
             <Grid item xs={12} sm={6} md={3}>
-              <TopCard 
-                title="Total Sessions" 
-                value={metrics.total_sessions.toString()} 
-                icon="mdi:chat" 
-                rate="0"
-                isUp={true}
-              />
+              <TopCard title="Total Sessions" value={metrics.total_sessions.toString()} icon="mdi:chat" rate="0" isUp={true} />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <TopCard 
-                title="API Spend" 
-                value={`$${metrics.total_cost.toFixed(4)}`} 
-                icon="mdi:currency-usd" 
-                rate="0"
-                isUp={true}
-              />
+              <TopCard title="API Spend" value={`$${metrics.total_cost.toFixed(4)}`} icon="mdi:currency-usd" rate="0" isUp={true} />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <TopCard 
-                title="AI Resolution Rate" 
-                value={`${metrics.resolution_rate}%`} 
-                icon="mdi:robot-outline" 
-                rate="0"
-                isUp={true}
-              />
+              <TopCard title="AI Resolution Rate" value={`${metrics.resolution_rate}%`} icon="mdi:robot-outline" rate="0" isUp={true} />
             </Grid>
             <Grid item xs={12} sm={6} md={3}>
-              <TopCard 
-                title="Leads Captured" 
-                value={metrics.lead_capture_count.toString()} 
-                icon="mdi:email-fast-outline" 
-                rate="0"
-                isUp={true}
-              />
+              <TopCard title="Leads Captured" value={metrics.lead_capture_count.toString()} icon="mdi:email-fast-outline" rate="0" isUp={true} />
             </Grid>
           </>
         ) : (

@@ -2,14 +2,29 @@ import { useEffect, useState } from 'react';
 import { Box, Grid, Typography, CircularProgress } from '@mui/material';
 import TopCard from '../../components/sections/dashboard/top-cards/TopCard';
 
+// 1. Define the expected API data structure
+interface MetricsData {
+  total_sessions: number;
+  total_messages: number;
+  avg_messages_per_session: number;
+  total_tokens: number;
+  total_cost: number;
+  top_model: string;
+  resolution_rate: number;
+  handoff_rate: number;
+  lead_capture_count: number;
+  error?: string;
+}
+
 export default function Analytics() {
-  const [metrics, setMetrics] = useState<any>(null);
+  // 2. Use the interface instead of 'any'
+  const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/analytics/metrics')
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: MetricsData) => {
         if (!data.error) setMetrics(data);
         setLoading(false);
       })
@@ -26,7 +41,7 @@ export default function Analytics() {
       <Typography variant="h6" mb={2}>Engagement Metrics</Typography>
       <Grid container spacing={3} mb={4}>
         <Grid item xs={12} sm={4}><TopCard title="Total Sessions" value={metrics.total_sessions.toString()} icon="mdi:chat" rate="0" isUp={true}/></Grid>
-        <Grid item xs={12} sm={4}><TopCard title="Total Messages" value={metrics.total_messages.toString()} icon="mdi:message-reply-text" rate="0" isUp={true}/></Grid>
+        <Grid item xs={12} sm={4}><TopCard title="Total Messages" value={metrics.total_messages.toString()} icon="mdi:message-reply-text" rate="0" isUp={true} /></Grid>
         <Grid item xs={12} sm={4}><TopCard title="Avg Messages/Session" value={metrics.avg_messages_per_session.toString()} icon="mdi:chart-line" rate="0" isUp={true}/></Grid>
       </Grid>
 
