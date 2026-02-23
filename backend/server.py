@@ -149,6 +149,12 @@ def sync_knowledge_base(client_id, sheet_id, sheet_range):
     conn.close()
     return new_content
 
+
+# --- HEALTH CHECK FOR RENDER ---
+@app.route('/healthz', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy", "message": "Server is running!"}), 200
+
 # --- 2. API & AUTH ROUTES ---
 
 @app.route('/api/chat', methods=['POST'])
