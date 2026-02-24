@@ -391,7 +391,8 @@ def get_analytics_metrics():
             "top_model": top_model_row[0] if top_model_row else "N/A",
             "handoff_rate": round((handoff_count / total_sessions) * 100, 1) if total_sessions > 0 else 0,
             "resolution_rate": round(((total_sessions - handoff_count) / total_sessions) * 100, 1) if total_sessions > 0 else 0,
-            "lead_capture_count": lead_count
+            "lead_capture_count": lead_count,
+            "client_id": session['client_id']
         }
         return jsonify(metrics)
     except Exception as e:
@@ -710,7 +711,8 @@ def get_ai_settings():
         "provider": provider or "google",
         "model": model or "gemini/gemini-2.5-flash",
         "has_key": bool(key),
-        "system_instruction": instr or "You are a helpful assistant."
+        "system_instruction": instr or "You are a helpful assistant.",
+        "client_id": session['client_id']
     })
 
 @app.route('/api/ai/test', methods=['POST'])

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import Grid from '@mui/material/Grid';
-import { Box, Typography, CircularProgress } from '@mui/material';
-import TopCards from 'components/sections/dashboard/top-cards';
-import WebsiteVisitors from 'components/sections/dashboard/website-visitors';
+import { Box, Typography, CircularProgress, Paper } from '@mui/material';
+// Removing TopCards and WebsiteVisitors imports per your requirement
 import TopCard from 'components/sections/dashboard/top-cards/TopCard';
+import TestChatWidget from 'components/common/TestChatWidget';
 
-// 1. Add Interface
 interface MetricsData {
   total_sessions: number;
   total_messages: number;
@@ -16,11 +15,11 @@ interface MetricsData {
   resolution_rate: number;
   handoff_rate: number;
   lead_capture_count: number;
+  client_id?: string; // Add this
   error?: string;
 }
 
 const Dashboard = () => {
-  // 2. Apply interface
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -67,13 +66,12 @@ const Dashboard = () => {
         )}
       </Grid>
 
-      {/* Your Existing Dashboard Content */}
+      {/* Replaced Existing Dashboard Content with Test Chat Widget */}
       <Grid container spacing={{ xs: 2.5, sm: 3, lg: 3.75 }}>
-        <Grid item xs={12}>
-          <TopCards />
-        </Grid>
-        <Grid item xs={12}>
-          <WebsiteVisitors />
+        <Grid item xs={12} md={8} lg={6}>
+          <Paper sx={{ p: 3, borderRadius: 4, bgcolor: 'background.default' }}>
+            <TestChatWidget clientId={metrics?.client_id} />
+          </Paper>
         </Grid>
       </Grid>
     </Box>

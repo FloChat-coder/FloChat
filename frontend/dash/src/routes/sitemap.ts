@@ -63,7 +63,7 @@ const sitemap: MenuItem[] = [
 },
   {
     id: 'leads',
-    subheader: 'Leads & Chats',
+    subheader: 'Leads',
     path: paths.leads,
     icon: 'mingcute:chat-4-fill',
   },

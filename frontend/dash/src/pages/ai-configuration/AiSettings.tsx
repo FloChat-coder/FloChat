@@ -4,9 +4,9 @@ import ErrorIcon from '@mui/icons-material/Error';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { 
-  Box, Button, Grid, Paper, Stack, TextField, Typography, Divider, MenuItem, Select, FormControl, InputLabel, InputAdornment, IconButton, CircularProgress, SelectChangeEvent
+   Button, Grid, Paper, Stack, TextField, Typography,  MenuItem, Select, FormControl, InputLabel, InputAdornment, IconButton, CircularProgress, SelectChangeEvent
 } from '@mui/material';
-
+import TestChatWidget from 'components/common/TestChatWidget';
 
 // Litellm Model Mapping
 const PROVIDER_MODELS: Record<string, { label: string, value: string }[]> = {
@@ -42,6 +42,7 @@ const AiSettings = () => {
   const [testStatus, setTestStatus] = useState<'idle'|'testing'|'success'|'error'>('idle');
   const [testMessage, setTestMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [clientId, setClientId] = useState<string>('');
 
   // Fetch initial settings
   useEffect(() => {
@@ -52,6 +53,7 @@ const AiSettings = () => {
           setProvider(data.provider);
           setModel(data.model);
           setPrompt(data.system_instruction);
+          setClientId(data.client_id);
           // We don't fetch the actual key for security, just let user know if it exists
           if (data.has_key) setApiKey('••••••••••••••••');
         }
@@ -222,14 +224,7 @@ const AiSettings = () => {
 
       <Grid item xs={12} md={6}>
         <Paper sx={{ p: 3, borderRadius: 4, height: '100%' }}>
-          <Typography variant="h6">Test Chat</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Remember to click "Save AI Settings" before testing the widget.
-          </Typography>
-          <Divider sx={{ my: 2 }} />
-          <Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'text.secondary', border: '1px dashed grey', borderRadius: 2 }}>
-            Widget Preview Placeholder
-          </Box>
+          <TestChatWidget clientId={clientId} />
         </Paper>
       </Grid>
     </Grid>

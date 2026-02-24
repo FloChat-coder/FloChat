@@ -1,14 +1,14 @@
 // src/theme/colors.ts
 
 export const grey = {
-  50: '#F7FAFC',
-  100: '#D9E1FA',
-  200: '#D1DBF9',
-  300: '#AEB9E1',
-  400: '#7E89AC',
-  500: '#4A5568',
-  600: '#343B4F',
-  700: '#2D3748',
+  50: '#f6f6f6',
+  100: '#e7e7e7',
+  200: '#d1d1d1',
+  300: '#b0b0b0',
+  400: '#888888',
+  500: '#6d6d6d',
+  600: '#5d5d5d',
+  700: '#4c4c4c',
   800: '#454545', // <--- YOUR CARD COLOR (Dark Grey)
   900: '#3d3d3d', // <--- YOUR BACKGROUND COLOR (Pure Black)
 };
