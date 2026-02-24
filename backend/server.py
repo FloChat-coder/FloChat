@@ -1015,7 +1015,7 @@ def process_drive_file():
             
         # 2. Handle PDFs
         elif mime_type == 'application/pdf':
-            response = drive_service.files().get_media(fileId=file_id).execute()
+            response = drive_service.files().get_media(fileId=file_id, supportsAllDrives=True).execute()
             pdf_file = io.BytesIO(response)
             reader = PyPDF2.PdfReader(pdf_file)
             for page in reader.pages:

@@ -12,6 +12,7 @@ interface PickerBuilderInstance {
   setDeveloperKey: (key: string) => PickerBuilderInstance;
   setCallback: (cb: (data: PickerData) => void) => PickerBuilderInstance;
   build: () => { setVisible: (visible: boolean) => void };
+  setAppId: (appId: string) => PickerBuilderInstance;
 }
 
 declare global {
@@ -33,11 +34,12 @@ declare global {
 }
 
 const API_KEY = 'AIzaSyCHYKgQxCvqpUr8E3pXi01iz3vunjj32Qs'; // Replace this
-
+const APP_ID = '912740302014-jussrcee80qluv3j2ucku8jju4amllun'; // Replace this with your actual app ID
 const DriveDocs = () => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [pickerApiLoaded, setPickerApiLoaded] = useState(false);
+  
 
   useEffect(() => {
     // Load the Google Picker script dynamically
@@ -74,6 +76,7 @@ const DriveDocs = () => {
         .addView(view)
         .setOAuthToken(tokenData.token)
         .setDeveloperKey(API_KEY)
+        .setAppId(APP_ID)
         .setCallback(pickerCallback)
         .build();
         
