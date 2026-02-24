@@ -61,15 +61,20 @@ const TestChatWidget = ({ clientId }: { clientId?: string }) => {
   }
 
   return (
-    <Stack spacing={2} sx={{ height: '100%', position: 'relative' }}>
+    <Stack spacing={2.5} sx={{ height: '100%', width: '100%' }}>
       
-      {/* 1. Header Area - Centered Title & Positioned Copy Button */}
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative', mb: 1 }}>
-        <Typography variant="h6" fontWeight="bold" color="text.primary">
+      {/* 1. Header Area - Robust Flexbox for Centering & Spacing */}
+      <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+        {/* Left empty block to balance the right block */}
+        <Box sx={{ flex: 1 }} />
+        
+        {/* Centered Title */}
+        <Typography variant="h6" fontWeight="bold" color="text.primary" sx={{ flex: 1, textAlign: 'center', whiteSpace: 'nowrap' }}>
           Test Chat
         </Typography>
         
-        <Box sx={{ position: 'absolute', right: 0 }}>
+        {/* Right aligned Button */}
+        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
           <Tooltip title={copied ? "Copied!" : "Copy Widget Code"}>
             <Button
               variant={copied ? "contained" : "outlined"}
@@ -81,7 +86,8 @@ const TestChatWidget = ({ clientId }: { clientId?: string }) => {
                 borderRadius: 2, 
                 textTransform: 'none', 
                 fontWeight: 600,
-                boxShadow: copied ? 2 : 0
+                boxShadow: copied ? 2 : 0,
+                whiteSpace: 'nowrap'
               }}
             >
               {copied ? 'Copied' : 'Copy Code'}
@@ -104,28 +110,29 @@ const TestChatWidget = ({ clientId }: { clientId?: string }) => {
       }}>
         
         {/* Chat Header inside widget */}
-        <Box sx={{ p: 2, bgcolor: 'primary.main', color: '#fff', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Avatar sx={{ width: 32, height: 32, bgcolor: 'rgba(255,255,255,0.2)', fontSize: '1rem' }}>🤖</Avatar>
+        <Box sx={{ px: 2.5, py: 2, bgcolor: 'primary.main', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Avatar sx={{ width: 34, height: 34, bgcolor: 'rgba(255,255,255,0.2)', fontSize: '1.2rem' }}>🤖</Avatar>
           <Box>
-            <Typography variant="subtitle2" fontWeight="bold" sx={{ lineHeight: 1.2 }}>FloChat AI</Typography>
-            <Typography variant="caption" sx={{ opacity: 0.8 }}>Typically replies instantly</Typography>
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ lineHeight: 1.2, color: '#ffffff' }}>FloChat AI</Typography>
+            <Typography variant="caption" sx={{ opacity: 0.9, color: '#ffffff' }}>Typically replies instantly</Typography>
           </Box>
         </Box>
 
-        {/* 3. Messages Area with improved contrast */}
-        <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2.5, display: 'flex', flexDirection: 'column', gap: 2, bgcolor: '#F4F6F8' }}>
+        {/* 3. Messages Area - Forced hardcoded text colors to prevent dark-mode blending */}
+        <Box sx={{ flexGrow: 1, overflowY: 'auto', p: 2.5, display: 'flex', flexDirection: 'column', gap: 2.5, bgcolor: '#F4F6F8' }}>
           
           {/* Disclaimer text as a distinct system message */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
             <Typography sx={{ 
               fontSize: '0.75rem', 
-              color: 'text.secondary', 
-              bgcolor: 'rgba(0,0,0,0.05)', 
-              px: 2, 
-              py: 1, 
-              borderRadius: 2, 
+              color: '#475569', // Hardcoded dark slate color
+              bgcolor: 'rgba(0,0,0,0.06)', 
+              px: 2.5, 
+              py: 1.5, 
+              borderRadius: 2.5, 
               textAlign: 'center',
-              maxWidth: '90%'
+              maxWidth: '90%',
+              lineHeight: 1.4
             }}>
               Use this window to chat with your configured bot. This is for test purposes only so anything you say here will not be updated anywhere in your Dashboard.
             </Typography>
@@ -136,7 +143,8 @@ const TestChatWidget = ({ clientId }: { clientId?: string }) => {
             <Box key={idx} sx={{
               alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
               bgcolor: msg.role === 'user' ? 'primary.main' : '#ffffff',
-              color: msg.role === 'user' ? '#ffffff' : 'text.primary',
+              // Force dark text (#1e293b) on the white bot bubble, force white on user bubble
+              color: msg.role === 'user' ? '#ffffff' : '#1e293b', 
               px: 2, py: 1.5,
               borderRadius: 3,
               borderBottomRightRadius: msg.role === 'user' ? 4 : 20,
@@ -153,19 +161,19 @@ const TestChatWidget = ({ clientId }: { clientId?: string }) => {
             <Box sx={{ 
               alignSelf: 'flex-start', 
               bgcolor: '#ffffff', 
-              px: 2, py: 1.5, 
+              px: 2.5, py: 1.5, 
               borderRadius: 3, 
               borderBottomLeftRadius: 4,
               boxShadow: '0px 2px 8px rgba(0,0,0,0.06)'
             }}>
-              <CircularProgress size={18} thickness={5} sx={{ color: 'text.secondary' }} />
+              <CircularProgress size={18} thickness={5} sx={{ color: '#1e293b' }} />
             </Box>
           )}
           <div ref={messagesEndRef} />
         </Box>
 
         {/* 4. Modern Input Area */}
-        <Box sx={{ p: 2, bgcolor: '#ffffff', borderTop: '1px solid', borderColor: 'divider', display: 'flex', gap: 1.5, alignItems: 'center' }}>
+        <Box sx={{ p: 2, bgcolor: '#ffffff', borderTop: '1px solid', borderColor: 'rgba(0,0,0,0.08)', display: 'flex', gap: 1.5, alignItems: 'center' }}>
           <TextField
             size="small"
             fullWidth
@@ -178,17 +186,22 @@ const TestChatWidget = ({ clientId }: { clientId?: string }) => {
               '& .MuiOutlinedInput-root': { 
                 borderRadius: 50, 
                 bgcolor: '#F4F6F8',
+                color: '#1e293b', // Force input text to be dark
                 '& fieldset': { border: 'none' },
                 '&:hover fieldset': { border: 'none' },
                 '&.Mui-focused fieldset': { border: '1px solid', borderColor: 'primary.main' }
-              } 
+              },
+              '& .MuiInputBase-input::placeholder': {
+                color: '#94a3b8',
+                opacity: 1
+              }
             }}
           />
           <IconButton
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
             sx={{ 
-              bgcolor: input.trim() ? 'primary.main' : '#e0e0e0', 
+              bgcolor: input.trim() ? 'primary.main' : '#e2e8f0', 
               color: '#ffffff', 
               '&:hover': { bgcolor: 'primary.dark' }, 
               width: 42, 
