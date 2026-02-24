@@ -16,6 +16,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+import io
+import PyPDF2
+
 # Universal LLM Router
 import litellm 
 from litellm import completion, token_counter, get_max_tokens, completion_cost
@@ -61,7 +64,7 @@ CLIENT_SECRETS_FILE = get_client_secrets_file()
 SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/spreadsheets.readonly',
-    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/drive.file',
     'openid'
 ]
 
@@ -965,6 +968,81 @@ def oauth2callback():
     except Exception as e:
         logging.error(f"Callback Error: {e}")
         return f"Authentication failed: {e}", 500
+    
+@app.route('/api/auth/token', methods=['GET'])
+def get_access_token():
+    if 'client_id' not in session: 
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT google_token FROM clients WHERE client_id = %s", (session['client_id'],))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    if row and row[0]:
+        return jsonify({"token": row[0]})
+    return jsonify({"error": "No token found"}), 404
+
+@app.route('/api/drive/process', methods=['POST'])
+def process_drive_file():
+    if 'client_id' not in session: 
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    client_id = session['client_id']
+    data = request.json
+    file_id = data.get('fileId')
+    
+    if not file_id:
+        return jsonify({"error": "No file ID provided"}), 400
+
+    _, drive_service = get_user_services(client_id)
+    if not drive_service:
+        return jsonify({"error": "Failed to connect to Google Drive"}), 500
+
+    try:
+        # Get file metadata
+        file_meta = drive_service.files().get(fileId=file_id, fields="mimeType, name").execute()
+        mime_type = file_meta.get('mimeType')
+        
+        extracted_text = ""
+        
+        # 1. Handle Google Docs
+        if mime_type == 'application/vnd.google-apps.document':
+            response = drive_service.files().export(fileId=file_id, mimeType='text/plain').execute()
+            extracted_text = response.decode('utf-8')
+            
+        # 2. Handle PDFs
+        elif mime_type == 'application/pdf':
+            response = drive_service.files().get_media(fileId=file_id).execute()
+            pdf_file = io.BytesIO(response)
+            reader = PyPDF2.PdfReader(pdf_file)
+            for page in reader.pages:
+                text = page.extract_text()
+                if text: extracted_text += text + "\n"
+        else:
+            return jsonify({"error": "Unsupported file type. Please select a Google Doc or PDF."}), 400
+
+        # Chunk the text to mimic the JSON array structure used by sheets
+        paragraphs = [p.strip() for p in extracted_text.split('\n\n') if p.strip()]
+        json_data = [{"content": p} for p in paragraphs if len(p) > 10] # Filter out tiny noise
+        
+        new_content = json.dumps(json_data, ensure_ascii=False)
+        
+        # Save to database (We save file_id into sheet_id column to reuse your sync logic later)
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("UPDATE clients SET sheet_id = %s, cached_content = %s, last_synced_at = NOW() WHERE client_id = %s", (file_id, new_content, client_id))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"success": True, "message": "Document processed and saved to knowledge base."})
+
+    except Exception as e:
+        logging.error(f"File Processing Error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # --- 4. STATIC & FRONTEND SERVING ROUTES ---
 

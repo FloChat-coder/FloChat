@@ -11,3 +11,4 @@ flask-session
 requests
 werkzeug
 litellm
+PyPDF2

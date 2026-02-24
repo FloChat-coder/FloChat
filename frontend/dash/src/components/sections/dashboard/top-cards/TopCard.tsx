@@ -21,18 +21,18 @@ const TopCard = (props: TopCardProps) => {
   return (
     <Grid item xs={12} sm={6} xl={3}>
       <Stack
-        p={2.25}
-        pl={2.5}
+        p={4}
+        pl={4}
         direction="column"
         component={Paper}
-        gap={1.5}
-        minHeight={116} // Changed from fixed height to minHeight to prevent overflow
+        gap={2}
+        minHeight={200} // Changed from fixed height to minHeight to prevent overflow
         width={1}
       >
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
           <Stack direction="row" alignItems="center" gap={1}>
-            <IconifyIcon icon={icon} color="primary.main" fontSize="h5.fontSize" />
-            <Typography variant="subtitle2" color="text.secondary" fontFamily={fontFamily.workSans}>
+            <IconifyIcon icon={icon} color="primary.main" fontSize="h4.fontSize" />
+            <Typography variant="h6" color="text.secondary" fontFamily={fontFamily.workSans}>
               {title}
             </Typography>
           </Stack>
@@ -50,10 +50,10 @@ const TopCard = (props: TopCardProps) => {
           direction="row" 
           alignItems="center" 
           flexWrap="wrap" 
-          gap={1.5}
+          gap={2}
         >
           <Typography 
-            variant="h4" // Slightly scaled down from h3 to fit longer numbers better
+            variant="h3" // Slightly scaled down from h3 to fit longer numbers better
             fontWeight={600} 
             letterSpacing={1}
             sx={{ wordBreak: 'break-word' }} // Ensures long token numbers wrap instead of breaking out

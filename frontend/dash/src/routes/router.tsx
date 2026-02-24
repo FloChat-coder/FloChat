@@ -14,6 +14,7 @@ const Inbox = lazy(() => import('pages/inbox/Inbox'));
 const Chats = lazy(() => import('pages/chats/Chats'));
 const Leads = lazy(() => import('pages/leads/Leads'));
 const Analytics = lazy(() => import('pages/analytics/Analytics')); // <-- Ensure this is imported!
+const DriveDocs = lazy(() => import('pages/integrations/DriveDocs'));
 const App = lazy(() => import('App'));
 
 const router = createBrowserRouter(
@@ -43,6 +44,10 @@ const router = createBrowserRouter(
             {
               path: paths.integrations.googleSheets,
               element: <GoogleSheets />,
+            },
+            {
+              path: paths.integrations.drive,
+              element: <DriveDocs />, // <--- Update this to point to the new component
             },
             {
               path: paths.integrations.drive,
