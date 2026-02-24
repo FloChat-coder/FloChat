@@ -26,11 +26,11 @@ const TopCard = (props: TopCardProps) => {
         direction="column"
         component={Paper}
         gap={1.5}
-        height={116}
+        minHeight={116} // Changed from fixed height to minHeight to prevent overflow
         width={1}
       >
-        <Stack justifyContent="space-between">
-          <Stack alignItems="center" gap={1}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Stack direction="row" alignItems="center" gap={1}>
             <IconifyIcon icon={icon} color="primary.main" fontSize="h5.fontSize" />
             <Typography variant="subtitle2" color="text.secondary" fontFamily={fontFamily.workSans}>
               {title}
@@ -40,14 +40,24 @@ const TopCard = (props: TopCardProps) => {
           <IconButton
             aria-label="menu"
             size="small"
-            sx={{ color: 'neutral.light', fontSize: 'h5.fontSize' }}
+            sx={{ color: 'neutral.light', fontSize: 'h5.fontSize', p: 0 }}
           >
             <IconifyIcon icon="solar:menu-dots-bold" />
           </IconButton>
         </Stack>
 
-        <Stack alignItems="center" gap={0.875}>
-          <Typography variant="h3" fontWeight={600} letterSpacing={1}>
+        <Stack 
+          direction="row" 
+          alignItems="center" 
+          flexWrap="wrap" 
+          gap={1.5}
+        >
+          <Typography 
+            variant="h4" // Slightly scaled down from h3 to fit longer numbers better
+            fontWeight={600} 
+            letterSpacing={1}
+            sx={{ wordBreak: 'break-word' }} // Ensures long token numbers wrap instead of breaking out
+          >
             {value}
           </Typography>
           <RateChip rate={rate} isUp={isUp} />

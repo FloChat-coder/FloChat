@@ -6,24 +6,14 @@ import MainLayout from 'layouts/main-layout';
 import Splash from 'components/loading/Splash';
 import PageLoader from 'components/loading/PageLoader';
 
-// 1. Dashboard Import
+// --- Imports ---
 const Dashboard = lazy(() => import('pages/dashboard'));
-
-// 2. Integration Imports
 const GoogleSheets = lazy(() => import('pages/integrations/GoogleSheets'));
-
-// 3. AI Configuration Imports
 const AiSettings = lazy(() => import('pages/ai-configuration/AiSettings'));
-
-const Leads = lazy(() => import('pages/leads/Leads'));
-
-// 4. Inbox
 const Inbox = lazy(() => import('pages/inbox/Inbox'));
-
-// Chats
 const Chats = lazy(() => import('pages/chats/Chats'));
-
-// Fallback App Component
+const Leads = lazy(() => import('pages/leads/Leads'));
+const Analytics = lazy(() => import('pages/analytics/Analytics')); // <-- Ensure this is imported!
 const App = lazy(() => import('App'));
 
 const router = createBrowserRouter(
@@ -37,6 +27,7 @@ const router = createBrowserRouter(
       children: [
         {
           path: '/',
+          // EVERYTHING INSIDE THIS MAINLAYOUT BLOCK GETS THE SIDEBAR
           element: (
             <MainLayout>
               <Suspense fallback={<PageLoader />}>
@@ -49,25 +40,17 @@ const router = createBrowserRouter(
               index: true,
               element: <Dashboard />,
             },
-            // --- FLOCHAT INTEGRATIONS ---
             {
               path: paths.integrations.googleSheets,
               element: <GoogleSheets />,
             },
             {
               path: paths.integrations.drive,
-              element: <GoogleSheets />, // Placeholder until Drive page is built
+              element: <GoogleSheets />,
             },
-            // --- FLOCHAT AI SETTINGS ---
             {
-              // CHANGED: Only one path mapped to AiSettings now
               path: paths.aiSettings,
               element: <AiSettings />,
-            },
-            {
-              // CHANGED: Only one path mapped to AiSettings now
-              path: paths.leads,
-              element: <Leads />,
             },
             {
               path: paths.inbox,
@@ -77,18 +60,30 @@ const router = createBrowserRouter(
               path: paths.chats,
               element: <Chats />,
             },
+            {
+              path: paths.leads,
+              element: <Leads />,
+            },
+            {
+              path: paths.analytics,
+              element: <Analytics />, // <-- Placed securely inside MainLayout!
+            },
           ],
         },
       ],
     },
     {
       path: '*',
-      element: <Dashboard />,
+      element: (
+        <MainLayout>
+          <Dashboard />
+        </MainLayout>
+      ),
     },
   ],
   {
     basename: '/dashboard', 
-  },
+  }
 );
 
 export default router;
