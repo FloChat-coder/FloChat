@@ -32,6 +32,11 @@ const sitemap: MenuItem[] = [
     icon: 'mingcute:plugin-2-fill',
     items: [
       {
+        name: 'All',
+        pathName: 'all',
+        path: '/pages/integrations/all', 
+      },
+      {
         name: 'Google Sheets',
         pathName: 'google-sheets',
         path: paths.integrations.googleSheets,

@@ -5,10 +5,12 @@ import paths from './paths';
 import MainLayout from 'layouts/main-layout';
 import Splash from 'components/loading/Splash';
 import PageLoader from 'components/loading/PageLoader';
+// import AllIntegrations from 'pages/integrations/AllIntegrations';
 
 // --- Imports ---
 const Dashboard = lazy(() => import('pages/dashboard'));
 const GoogleSheets = lazy(() => import('pages/integrations/GoogleSheets'));
+const AllIntegrations = lazy(() => import('pages/integrations/AllIntegrations'));
 const AiSettings = lazy(() => import('pages/ai-configuration/AiSettings'));
 const Inbox = lazy(() => import('pages/inbox/Inbox'));
 const Chats = lazy(() => import('pages/chats/Chats'));
@@ -42,6 +44,10 @@ const router = createBrowserRouter(
               element: <Dashboard />,
             },
             {
+              path: '/pages/integrations/all', 
+              element: <AllIntegrations />,
+            },
+            {
               path: paths.integrations.googleSheets,
               element: <GoogleSheets />,
             },
@@ -49,10 +55,10 @@ const router = createBrowserRouter(
               path: paths.integrations.drive,
               element: <DriveDocs />, // <--- Update this to point to the new component
             },
-            {
-              path: paths.integrations.drive,
-              element: <GoogleSheets />,
-            },
+            // {
+            //   path: paths.integrations.drive,
+            //   element: <GoogleSheets />,
+            // },
             {
               path: paths.aiSettings,
               element: <AiSettings />,

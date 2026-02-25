@@ -141,13 +141,13 @@ def fetch_and_process_sheet(client_id, sheet_id, sheet_range):
         logging.error(f"Sheet Read Error: {e}")
         return None
 
-def sync_knowledge_base(client_id, sheet_id, sheet_range):
-    new_content = fetch_and_process_sheet(client_id, sheet_id, sheet_range)
+def sync_knowledge_base(client_id, file_id, sheet_range):
+    new_content = fetch_and_process_sheet(client_id, file_id, sheet_range)
     if new_content is None: return None
 
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("UPDATE clients SET cached_content = %s, last_synced_at = NOW() WHERE client_id = %s", (new_content, client_id))
+    cur.execute("UPDATE knowledge_bases SET cached_content = %s, last_synced_at = NOW() WHERE client_id = %s AND file_id = %s", (new_content, client_id, file_id))
     conn.commit()
     cur.close()
     conn.close()
@@ -181,49 +181,66 @@ def chat():
     try:
         # 1. Get Client Data
         cur.execute("""
-            SELECT business_name, sheet_id, api_key, ai_provider, model_name, sheet_range, cached_content, last_synced_at, system_instruction 
+            SELECT business_name, api_key, ai_provider, model_name, system_instruction 
             FROM clients WHERE client_id = %s
         """, (client_id,))
         row = cur.fetchone()
 
-        if not row: 
-            return jsonify({"reply": "Invalid Client ID"})
-        
-        b_name, sheet_id, api_key, ai_provider, model_name, sheet_range, cached_content, db_last_synced, sys_instr = row
+        if not row: return jsonify({"reply": "Invalid Client ID"})
+        b_name, api_key, ai_provider, model_name, sys_instr = row
 
         if not api_key or not model_name:
             return jsonify({"reply": "AI Provider not configured. Please add your API key in the dashboard."})
 
-        # --- KNOWLEDGE BASE SELECTION ---
+        # --- MULTI-KNOWLEDGE BASE COMBINATION ---
         if temp_context:
             knowledge_base = json.dumps(temp_context)
             system_note = "IMPORTANT: Answer solely based on the USER PROVIDED DATA GRID below."
         else:
-            need_sync = False
+            cur.execute("SELECT file_id, file_type, sheet_range, cached_content, last_synced_at FROM knowledge_bases WHERE client_id = %s", (client_id,))
+            kbs = cur.fetchall()
+            
+            if not kbs:
+                return jsonify({"reply": "I'm not ready yet. Please configure my knowledge base."})
+
+            combined_data = []
             _, drive_service = get_user_services(client_id)
             
-            if drive_service and sheet_id:
-                try:
-                    file_meta = drive_service.files().get(fileId=sheet_id, fields="modifiedTime").execute()
-                    google_time = parser.parse(file_meta.get('modifiedTime'))
-                    if db_last_synced is None:
-                        need_sync = True
-                    else:
-                        if db_last_synced.tzinfo is None:
-                            db_last_synced = db_last_synced.replace(tzinfo=timezone.utc)
-                        if google_time > db_last_synced:
-                            need_sync = True
-                except Exception as e:
-                    if not cached_content: need_sync = True
-            
-            if need_sync:
-                updated = sync_knowledge_base(client_id, sheet_id, sheet_range)
-                if updated: cached_content = updated
-
-            if not cached_content or cached_content == "[]":
-                return jsonify({"reply": "I'm not ready yet. Please configure my knowledge base."})
+            for file_id, file_type, sheet_range, cached_content, db_last_synced in kbs:
+                need_sync = False
+                current_content = cached_content
                 
-            knowledge_base = cached_content
+                # Only Google Sheets require dynamic live-syncing logic right now
+                if file_type == 'sheet' and drive_service and file_id:
+                    try:
+                        file_meta = drive_service.files().get(fileId=file_id, fields="modifiedTime").execute()
+                        google_time = parser.parse(file_meta.get('modifiedTime'))
+                        if db_last_synced is None:
+                            need_sync = True
+                        else:
+                            if db_last_synced.tzinfo is None:
+                                db_last_synced = db_last_synced.replace(tzinfo=timezone.utc)
+                            if google_time > db_last_synced:
+                                need_sync = True
+                    except Exception as e:
+                        if not current_content: need_sync = True
+                
+                if need_sync:
+                    updated = sync_knowledge_base(client_id, file_id, sheet_range)
+                    if updated: current_content = updated
+
+                # Parse the JSON string back to a list and add it to our combined master list
+                if current_content and current_content != "[]":
+                    try:
+                        combined_data.extend(json.loads(current_content))
+                    except json.JSONDecodeError:
+                        pass
+            
+            if not combined_data:
+                return jsonify({"reply": "I'm not ready yet. My knowledge bases are currently empty."})
+                
+            knowledge_base = json.dumps(combined_data, ensure_ascii=False)
+            
             system_note = "CRITICAL INSTRUCTION: You will answer greetings but " \
             "if the question is about a product you MUST answer based STRICTLY on " \
             "the DATA provided above. If the exact answer is not present in the DATA, " \
@@ -987,33 +1004,27 @@ def get_access_token():
 
 @app.route('/api/drive/process', methods=['POST'])
 def process_drive_file():
-    if 'client_id' not in session: 
-        return jsonify({"error": "Unauthorized"}), 401
+    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
     
     client_id = session['client_id']
-    data = request.json
-    file_id = data.get('fileId')
-    
-    if not file_id:
-        return jsonify({"error": "No file ID provided"}), 400
+    file_id = request.json.get('fileId')
+    if not file_id: return jsonify({"error": "No file ID provided"}), 400
 
     _, drive_service = get_user_services(client_id)
-    if not drive_service:
-        return jsonify({"error": "Failed to connect to Google Drive"}), 500
+    if not drive_service: return jsonify({"error": "Failed to connect to Google Drive"}), 500
 
     try:
-        # Get file metadata
-        file_meta = drive_service.files().get(fileId=file_id, fields="mimeType, name").execute()
+        file_meta = drive_service.files().get(fileId=file_id, fields="mimeType, name", supportsAllDrives=True).execute()
         mime_type = file_meta.get('mimeType')
+        file_name = file_meta.get('name')
         
         extracted_text = ""
+        file_type = "unknown"
         
-        # 1. Handle Google Docs
         if mime_type == 'application/vnd.google-apps.document':
             response = drive_service.files().export(fileId=file_id, mimeType='text/plain').execute()
             extracted_text = response.decode('utf-8')
-            
-        # 2. Handle PDFs
+            file_type = 'doc'
         elif mime_type == 'application/pdf':
             response = drive_service.files().get_media(fileId=file_id, supportsAllDrives=True).execute()
             pdf_file = io.BytesIO(response)
@@ -1021,28 +1032,73 @@ def process_drive_file():
             for page in reader.pages:
                 text = page.extract_text()
                 if text: extracted_text += text + "\n"
+            file_type = 'pdf'
         else:
-            return jsonify({"error": "Unsupported file type. Please select a Google Doc or PDF."}), 400
+            return jsonify({"error": "Unsupported file type."}), 400
 
-        # Chunk the text to mimic the JSON array structure used by sheets
         paragraphs = [p.strip() for p in extracted_text.split('\n\n') if p.strip()]
-        json_data = [{"content": p} for p in paragraphs if len(p) > 10] # Filter out tiny noise
-        
+        json_data = [{"content": p} for p in paragraphs if len(p) > 10] 
         new_content = json.dumps(json_data, ensure_ascii=False)
         
-        # Save to database (We save file_id into sheet_id column to reuse your sync logic later)
+        # INSERT into the new knowledge_bases table
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("UPDATE clients SET sheet_id = %s, cached_content = %s, last_synced_at = NOW() WHERE client_id = %s", (file_id, new_content, client_id))
+        cur.execute("""
+            INSERT INTO knowledge_bases (client_id, file_id, file_name, file_type, cached_content) 
+            VALUES (%s, %s, %s, %s, %s)
+        """, (client_id, file_id, file_name, file_type, new_content))
         conn.commit()
         cur.close()
         conn.close()
         
-        return jsonify({"success": True, "message": "Document processed and saved to knowledge base."})
-
+        return jsonify({"success": True, "message": "Document added to knowledge base."})
     except Exception as e:
-        logging.error(f"File Processing Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/integrations/list', methods=['GET'])
+def list_integrations():
+    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
+        
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # Fetch ALL knowledge bases for this client
+    cur.execute("SELECT id, file_id, file_name, file_type, sheet_range, cached_content FROM knowledge_bases WHERE client_id = %s ORDER BY last_synced_at DESC", (session['client_id'],))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    results = []
+    for row in rows:
+        db_id, file_id, file_name, file_type, sheet_range, cached_content = row
+        item_count = len(json.loads(cached_content)) if cached_content else 0
+        
+        details = f"{item_count} items extracted"
+        if file_type == 'sheet':
+            details = f"Range: {sheet_range or 'N/A'} • {item_count} rows"
+            
+        results.append({
+            "id": db_id,           # The Database Primary Key (used for deleting)
+            "file_id": file_id,    # The Google Drive ID
+            "name": file_name,
+            "type": file_type,
+            "details": details
+        })
+        
+    return jsonify(results)
+
+@app.route('/api/integrations/delete', methods=['POST'])
+def delete_integration():
+    if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
+    
+    kb_id = request.json.get('id')
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM knowledge_bases WHERE id = %s AND client_id = %s", (kb_id, session['client_id']))
+    conn.commit()
+    cur.close()
+    conn.close()
+    
+    return jsonify({"success": True})
 
 # --- 4. STATIC & FRONTEND SERVING ROUTES ---
 
