@@ -76,21 +76,24 @@ def get_db_connection():
         return None
 
 # --- HELPER: DYNAMIC GOOGLE AUTH ---
+# --- HELPER: DYNAMIC GOOGLE AUTH ---
 def get_user_services(client_id):
     conn = get_db_connection()
     if not conn: return None, None
     
     cur = conn.cursor()
-    cur.execute("SELECT google_token, google_refresh_token, token_uri, client_id_google, client_secret_google FROM clients WHERE client_id = %s", (client_id,))
+    cur.execute("SELECT google_token, google_refresh_token FROM clients WHERE client_id = %s", (client_id,))
     row = cur.fetchone()
     cur.close()
     conn.close()
     
     if not row: return None, None
-    token, refresh_token, token_uri, client_id_google, client_secret_google = row
+    token, refresh_token = row
     
+    # Safely load the JSON whether it's categorized as 'web' or 'installed'
     with open(CLIENT_SECRETS_FILE, 'r') as f:
-        c_conf = json.load(f).get('web', {})
+        raw_conf = json.load(f)
+        c_conf = raw_conf.get('web') or raw_conf.get('installed') or {}
         
     creds = Credentials(
         token=token,
@@ -104,6 +107,13 @@ def get_user_services(client_id):
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
+            # Save the fresh token back to DB
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("UPDATE clients SET google_token = %s WHERE client_id = %s", (creds.token, client_id))
+            conn.commit()
+            cur.close()
+            conn.close()
         except Exception as e:
             logging.error(f"Token Refresh Failed for {client_id}: {e}")
             return None, None
@@ -923,6 +933,7 @@ def login():
         
         authorization_url, state = flow.authorization_url(
             access_type='offline',
+            prompt='consent',
             include_granted_scopes='true')
         
         session['state'] = state
@@ -958,15 +969,24 @@ def oauth2callback():
         existing_user = cur.fetchone()
         
         with open(CLIENT_SECRETS_FILE, 'r') as f:
-            c_conf = json.load(f).get('web', {})
+            raw_conf = json.load(f)
+            c_conf = raw_conf.get('web') or raw_conf.get('installed') or {}
 
         if existing_user:
             client_id = existing_user[0]
-            cur.execute("""
-                UPDATE clients 
-                SET google_token=%s, google_refresh_token=%s 
-                WHERE client_id=%s
-            """, (creds.token, creds.refresh_token, client_id))
+            # ONLY update the refresh token if a new one is provided by Google
+            if creds.refresh_token:
+                cur.execute("""
+                    UPDATE clients 
+                    SET google_token=%s, google_refresh_token=%s 
+                    WHERE client_id=%s
+                """, (creds.token, creds.refresh_token, client_id))
+            else:
+                cur.execute("""
+                    UPDATE clients 
+                    SET google_token=%s 
+                    WHERE client_id=%s
+                """, (creds.token, client_id))
         else:
             alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
             client_id = ''.join(secrets.choice(alphabet) for i in range(5))
