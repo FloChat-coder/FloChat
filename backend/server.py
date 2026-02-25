@@ -965,35 +965,40 @@ def oauth2callback():
 
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("SELECT client_id FROM clients WHERE email = %s;", (email,))
-        existing_user = cur.fetchone()
         
         with open(CLIENT_SECRETS_FILE, 'r') as f:
             raw_conf = json.load(f)
             c_conf = raw_conf.get('web') or raw_conf.get('installed') or {}
 
-        if existing_user:
-            client_id = existing_user[0]
-            # ONLY update the refresh token if a new one is provided by Google
+        # --- NEW: ACCOUNT LINKING LOGIC ---
+        logged_in_client = session.get('client_id')
+        
+        if logged_in_client:
+            # User is already logged in via Email/Pass, attach Google tokens to their existing account
             if creds.refresh_token:
-                cur.execute("""
-                    UPDATE clients 
-                    SET google_token=%s, google_refresh_token=%s 
-                    WHERE client_id=%s
-                """, (creds.token, creds.refresh_token, client_id))
+                cur.execute("UPDATE clients SET google_token=%s, google_refresh_token=%s WHERE client_id=%s", (creds.token, creds.refresh_token, logged_in_client))
             else:
-                cur.execute("""
-                    UPDATE clients 
-                    SET google_token=%s 
-                    WHERE client_id=%s
-                """, (creds.token, client_id))
+                cur.execute("UPDATE clients SET google_token=%s WHERE client_id=%s", (creds.token, logged_in_client))
+            client_id = logged_in_client
+            
         else:
-            alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-            client_id = ''.join(secrets.choice(alphabet) for i in range(5))
-            cur.execute("""
-                INSERT INTO clients (client_id, email, google_token, google_refresh_token, token_uri, client_id_google, client_secret_google)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (client_id, email, creds.token, creds.refresh_token, creds.token_uri, c_conf.get('client_id'), c_conf.get('client_secret')))
+            # Normal Login/Signup logic for users not currently logged in
+            cur.execute("SELECT client_id FROM clients WHERE email = %s;", (email,))
+            existing_user = cur.fetchone()
+
+            if existing_user:
+                client_id = existing_user[0]
+                if creds.refresh_token:
+                    cur.execute("UPDATE clients SET google_token=%s, google_refresh_token=%s WHERE client_id=%s", (creds.token, creds.refresh_token, client_id))
+                else:
+                    cur.execute("UPDATE clients SET google_token=%s WHERE client_id=%s", (creds.token, client_id))
+            else:
+                alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+                client_id = ''.join(secrets.choice(alphabet) for i in range(5))
+                cur.execute("""
+                    INSERT INTO clients (client_id, email, google_token, google_refresh_token, token_uri, client_id_google, client_secret_google)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (client_id, email, creds.token, creds.refresh_token, creds.token_uri, c_conf.get('client_id'), c_conf.get('client_secret')))
         
         conn.commit()
         cur.close()
@@ -1105,6 +1110,21 @@ def list_integrations():
         })
         
     return jsonify(results)
+
+@app.route('/api/google/status', methods=['GET'])
+def check_google_status():
+    if 'client_id' not in session: 
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT google_token FROM clients WHERE client_id = %s", (session['client_id'],))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    
+    # Return true if they have a token, false if it's None/empty
+    return jsonify({"linked": bool(row and row[0])})
 
 @app.route('/api/sheets/save', methods=['POST'])
 def save_sheet():
