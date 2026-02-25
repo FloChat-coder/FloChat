@@ -1103,22 +1103,22 @@ def save_sheet():
     file_id = match.group(1)
     client_id = session['client_id']
     
-    # 2. Connect to Google APIs to verify access and get the title
-    _, drive_service = get_user_services(client_id)
-    if not drive_service:
+    # 2. Connect to Google APIs (Notice we fetch sheets_service instead of drive_service)
+    sheets_service, _ = get_user_services(client_id)
+    if not sheets_service:
         return jsonify({"error": "Failed to connect to Google API. Try logging in again."}), 500
         
     try:
-        # Get the actual name of the sheet
-        file_meta = drive_service.files().get(fileId=file_id, fields="name", supportsAllDrives=True).execute()
-        file_name = file_meta.get('name', 'Google Sheet')
+        # 3. Use the SHEETS API to get the title (Bypasses Drive sandbox restrictions)
+        sheet_metadata = sheets_service.spreadsheets().get(spreadsheetId=file_id).execute()
+        file_name = sheet_metadata.get('properties', {}).get('title', 'Google Sheet')
         
-        # 3. Fetch the initial data content
+        # 4. Fetch the initial data content
         new_content = fetch_and_process_sheet(client_id, file_id, sheet_range)
         if new_content is None or new_content == "[]":
             return jsonify({"error": "Could not read sheet. Ensure the range is correct and the sheet has data."}), 400
             
-        # 4. Insert into your new knowledge_bases table
+        # 5. Insert into your new knowledge_bases table
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
