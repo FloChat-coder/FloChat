@@ -10,20 +10,13 @@ interface KnowledgeBase {
   details: string;
 }
 
-interface SheetInputRow {
-  id: string;
-  url: string;
-  tabName: string;
-  range: string;
-  status: 'idle' | 'loading' | 'success' | 'error';
-  errorMessage: string;
-}
-
 const GoogleSheets = () => {
-  // 1. State for dynamic input rows
-  const [inputs, setInputs] = useState<SheetInputRow[]>([
-    { id: 'initial-row', url: '', tabName: 'Sheet1', range: 'A1:Z100', status: 'idle', errorMessage: '' }
-  ]);
+  // 1. Single set of input states
+  const [url, setUrl] = useState('');
+  const [tabName, setTabName] = useState('');
+  const [range, setRange] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
   
   // 2. State for previously connected sheets
   const [connectedSheets, setConnectedSheets] = useState<KnowledgeBase[]>([]);
@@ -49,60 +42,49 @@ const GoogleSheets = () => {
     fetchSheets();
   }, []);
 
-  // --- Input Row Handlers ---
-  const updateInput = (index: number, updates: Partial<SheetInputRow>) => {
-    const newInputs = [...inputs];
-    newInputs[index] = { ...newInputs[index], ...updates };
-    setInputs(newInputs);
-  };
-
-  const handleAddMore = () => {
-    setInputs([
-      ...inputs, 
-      { id: Math.random().toString(), url: '', tabName: 'Sheet1', range: 'A1:Z100', status: 'idle', errorMessage: '' }
-    ]);
-  };
-
-  const handleRemoveRow = (index: number) => {
-    const newInputs = [...inputs];
-    newInputs.splice(index, 1);
-    setInputs(newInputs);
-  };
-
-  const handleConnect = async (index: number) => {
-    const row = inputs[index];
-    
-    if (!row.url) {
-      updateInput(index, { status: 'error', errorMessage: "Please enter a valid Google Sheets URL" });
+  // --- Handle Connecting ---
+  const handleConnect = async () => {
+    if (!url) {
+      setStatus('error');
+      setErrorMessage("Please enter a valid Google Sheets URL");
       return;
     }
-    if (!row.tabName || !row.range) {
-      updateInput(index, { status: 'error', errorMessage: "Tab Name and Range are required" });
+    if (!tabName || !range) {
+      setStatus('error');
+      setErrorMessage("Tab Name and Range are required");
       return;
     }
 
-    updateInput(index, { status: 'loading', errorMessage: '' });
+    setStatus('loading');
+    setErrorMessage('');
 
     try {
       // Concatenate the inputs securely for the backend
-      const combinedRange = `${row.tabName}!${row.range}`;
+      const combinedRange = `${tabName}!${range}`;
       
       const response = await fetch('/api/sheets/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sheetUrl: row.url, range: combinedRange }),
+        body: JSON.stringify({ sheetUrl: url, range: combinedRange }),
       });
       
       const data = await response.json();
       
       if (response.ok && data.success) {
-        updateInput(index, { status: 'success', url: '' }); // Clear URL on success
+        // Clear form and show success
+        setStatus('success');
+        setUrl('');
+        setTabName('Sheet1');
+        setRange('A1:Z100');
+        
         fetchSheets(); // Refresh the table below
       } else {
-        updateInput(index, { status: 'error', errorMessage: data.error || "Failed to connect sheet." });
+        setStatus('error');
+        setErrorMessage(data.error || "Failed to connect sheet.");
       }
-    } catch (error: any) {
-      updateInput(index, { status: 'error', errorMessage: error.message || "A network error occurred." });
+    } catch (error: unknown) { 
+      setStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : "A network error occurred.");
     }
   };
 
@@ -128,86 +110,62 @@ const GoogleSheets = () => {
       <Grid item xs={12}>
         <Typography variant="h4">Google Sheets Integration</Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-          Connect Google Sheets to serve as your chatbot's dynamic knowledge base. Add them one by one below.
+          Connect Google Sheets to serve as your chatbot's dynamic knowledge base. Add them below.
         </Typography>
       </Grid>
       
       {/* CONNECTION FORM */}
       <Grid item xs={12}>
         <Paper sx={{ p: 4, borderRadius: 4 }}>
-          <Typography variant="h6" mb={3}>Add New Sheets</Typography>
+          <Typography variant="h6" mb={3}>Add New Sheet</Typography>
           
-          <Stack spacing={4}>
-            {inputs.map((row, index) => (
-              <Box key={row.id}>
-                <Stack 
-                  direction={{ xs: 'column', md: 'row' }} 
-                  spacing={2} 
-                  alignItems={{ xs: 'stretch', md: 'flex-start' }}
-                >
-                  <TextField 
-                    label="Sheet URL" 
-                    placeholder="https://docs.google.com/spreadsheets/d/..." 
-                    value={row.url} 
-                    onChange={(e) => updateInput(index, { url: e.target.value, status: 'idle' })} 
-                    sx={{ flexGrow: 1 }}
-                    disabled={row.status === 'loading'}
-                  />
-                  <TextField 
-                    label="Tab Name" 
-                    placeholder="Sheet1"
-                    value={row.tabName} 
-                    onChange={(e) => updateInput(index, { tabName: e.target.value, status: 'idle' })} 
-                    sx={{ width: { xs: '100%', md: '180px' } }}
-                    disabled={row.status === 'loading'}
-                  />
-                  <TextField 
-                    label="Data Range" 
-                    placeholder="A1:Z100"
-                    value={row.range} 
-                    onChange={(e) => updateInput(index, { range: e.target.value, status: 'idle' })} 
-                    sx={{ width: { xs: '100%', md: '140px' } }}
-                    disabled={row.status === 'loading'}
-                  />
-                  
-                  <Button 
-                    variant="contained" 
-                    onClick={() => handleConnect(index)}
-                    disabled={row.status === 'loading'}
-                    sx={{ height: 56, minWidth: 120 }}
-                  >
-                    {row.status === 'loading' ? <CircularProgress size={24} color="inherit" /> : "Connect"}
-                  </Button>
-
-                  {inputs.length > 1 && (
-                    <IconButton 
-                      color="error" 
-                      onClick={() => handleRemoveRow(index)}
-                      sx={{ height: 56, width: 56 }}
-                      disabled={row.status === 'loading'}
-                    >
-                      <IconifyIcon icon="mingcute:delete-2-fill" />
-                    </IconButton>
-                  )}
-                </Stack>
-
-                {row.status === 'success' && (
-                  <Alert severity="success" sx={{ mt: 2 }}>Sheet successfully connected!</Alert>
-                )}
-                {row.status === 'error' && (
-                  <Alert severity="error" sx={{ mt: 2 }}>{row.errorMessage}</Alert>
-                )}
-              </Box>
-            ))}
-
-            <Button 
-              variant="text" 
-              startIcon={<IconifyIcon icon="mingcute:add-fill" />} 
-              onClick={handleAddMore}
-              sx={{ width: 'fit-content' }}
+          <Stack spacing={2}>
+            <Stack 
+              direction={{ xs: 'column', md: 'row' }} 
+              spacing={2} 
+              alignItems={{ xs: 'stretch', md: 'flex-start' }}
             >
-              Add More
-            </Button>
+              <TextField 
+                placeholder="Sheet URL (https://docs.google.com/...)" 
+                value={url} 
+                onChange={(e) => { setUrl(e.target.value); setStatus('idle'); }} 
+                sx={{ flexGrow: 1, width: { xs: '100%', md: '400px' } }}
+                disabled={status === 'loading'}
+                InputProps={{ sx: { height: 56 } }}
+              />
+              <TextField 
+                placeholder="Tab Name (e.g. Sheet1)"
+                value={tabName} 
+                onChange={(e) => { setTabName(e.target.value); setStatus('idle'); }} 
+                sx={{ width: { xs: '100%', md: '200px' } }}
+                disabled={status === 'loading'}
+                InputProps={{ sx: { height: 56 } }}
+              />
+              <TextField 
+                placeholder="Range (e.g. A1:Z100)"
+                value={range} 
+                onChange={(e) => { setRange(e.target.value); setStatus('idle'); }} 
+                sx={{ width: { xs: '100%', md: '150px' } }}
+                disabled={status === 'loading'}
+                InputProps={{ sx: { height: 56 } }}
+              />
+              
+              <Button 
+                variant="contained" 
+                onClick={handleConnect}
+                disabled={status === 'loading'}
+                sx={{ height: 56, minWidth: 120 }}
+              >
+                {status === 'loading' ? <CircularProgress size={24} color="inherit" /> : "Connect"}
+              </Button>
+            </Stack>
+
+            {status === 'success' && (
+              <Alert severity="success" sx={{ mt: 2 }}>Sheet successfully connected!</Alert>
+            )}
+            {status === 'error' && (
+              <Alert severity="error" sx={{ mt: 2 }}>{errorMessage}</Alert>
+            )}
           </Stack>
         </Paper>
       </Grid>
@@ -233,7 +191,6 @@ const GoogleSheets = () => {
                 <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
                   <Typography variant="h6" noWrap>{sheet.name}</Typography>
                   <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', gap: 1 }}>
-                    {/* Displaying details string which already contains the full Range info */}
                     <Chip size="small" label={sheet.details} color="primary" variant="outlined" />
                     <Chip size="small" label={`ID: ${sheet.file_id.substring(0, 8)}...`} variant="outlined" />
                     <Chip size="small" label="Active Sync" color="success" />
