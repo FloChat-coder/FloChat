@@ -19,7 +19,7 @@ const TopCard = (props: TopCardProps) => {
   const { icon, title, value, rate, isUp } = props;
 
   return (
-    <Grid item xs={12} sm={6} xl={3}>
+    <Grid item xs={12} sm={10} xl={6}>
       <Stack
         p={4}
         pl={4}
@@ -27,7 +27,7 @@ const TopCard = (props: TopCardProps) => {
         component={Paper}
         gap={2}
         minHeight={200} // Changed from fixed height to minHeight to prevent overflow
-        width={1}
+        width="100%"
       >
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
           <Stack direction="row" alignItems="center" gap={1}>

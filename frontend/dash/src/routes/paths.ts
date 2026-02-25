@@ -10,6 +10,7 @@ const paths = {
   
   // FloChat Internal Paths
   integrations: {
+    all: `/${rootPaths.pagesRoot}/integrations/all`,
     googleSheets: `/${rootPaths.pagesRoot}/integrations/google-sheets`,
     drive: `/${rootPaths.pagesRoot}/integrations/drive`,
   },

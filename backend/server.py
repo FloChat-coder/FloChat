@@ -1086,6 +1086,55 @@ def list_integrations():
         
     return jsonify(results)
 
+@app.route('/api/sheets/save', methods=['POST'])
+def save_sheet():
+    if 'client_id' not in session: 
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.json
+    sheet_url = data.get('sheetUrl', '')
+    sheet_range = data.get('range', 'A1:Z100')
+    
+    # 1. Extract the unique Google Sheet ID from the URL
+    match = re.search(r'/d/([a-zA-Z0-9-_]+)', sheet_url)
+    if not match:
+        return jsonify({"error": "Invalid Google Sheets URL"}), 400
+    
+    file_id = match.group(1)
+    client_id = session['client_id']
+    
+    # 2. Connect to Google APIs to verify access and get the title
+    _, drive_service = get_user_services(client_id)
+    if not drive_service:
+        return jsonify({"error": "Failed to connect to Google API. Try logging in again."}), 500
+        
+    try:
+        # Get the actual name of the sheet
+        file_meta = drive_service.files().get(fileId=file_id, fields="name", supportsAllDrives=True).execute()
+        file_name = file_meta.get('name', 'Google Sheet')
+        
+        # 3. Fetch the initial data content
+        new_content = fetch_and_process_sheet(client_id, file_id, sheet_range)
+        if new_content is None or new_content == "[]":
+            return jsonify({"error": "Could not read sheet. Ensure the range is correct and the sheet has data."}), 400
+            
+        # 4. Insert into your new knowledge_bases table
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO knowledge_bases (client_id, file_id, file_name, file_type, sheet_range, cached_content) 
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (client_id, file_id, file_name, 'sheet', sheet_range, new_content))
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        return jsonify({"success": True, "message": "Sheet connected successfully!"})
+        
+    except Exception as e:
+        logging.error(f"Sheet Save Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/integrations/delete', methods=['POST'])
 def delete_integration():
     if 'client_id' not in session: return jsonify({"error": "Unauthorized"}), 401
