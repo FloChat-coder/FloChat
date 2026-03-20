@@ -4,7 +4,7 @@ import logging
 import requests
 import smtplib
 import json
-from flask import Blueprint, request, jsonify, session, redirect, url_for
+from flask import Blueprint, redirect, request, session, url_for, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from email.mime.text import MIMEText
 from google_auth_oauthlib.flow import Flow
@@ -132,7 +132,14 @@ def login():
         flow = Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES)
         flow.redirect_uri = url_for('auth.oauth2callback', _external=True, _scheme='https')
         authorization_url, state = flow.authorization_url(access_type='offline', prompt='consent', include_granted_scopes='true')
+        
+        # Save the state to the session
         session['state'] = state
+        
+        # ADD THIS: Save the PKCE code verifier to the session if it exists
+        if hasattr(flow, 'code_verifier'):
+            session['code_verifier'] = flow.code_verifier
+            
         return redirect(authorization_url)
     except Exception as e:
         return f"Error starting login: {e}", 500
@@ -145,6 +152,11 @@ def oauth2callback():
     try:
         flow = Flow.from_client_secrets_file(CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
         flow.redirect_uri = url_for('auth.oauth2callback', _external=True, _scheme='https')
+
+        # ADD THIS: Restore the PKCE code verifier from the session
+        code_verifier = session.get('code_verifier')
+        if code_verifier:
+            flow.code_verifier = code_verifier
 
         authorization_response = request.url.replace('http:', 'https:', 1) if request.url.startswith('http:') else request.url
         flow.fetch_token(authorization_response=authorization_response)
